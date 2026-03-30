@@ -14,8 +14,8 @@
       "id": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
       "name": "Flavors",
       "position": {
-        "x": 410,
-        "y": 671
+        "x": 416,
+        "y": 694
       },
       "cities": [],
       "color": "#a8dadc"
@@ -78,6 +78,45 @@
       "label": "Sensory",
       "paperIds": [],
       "gapIds": []
+    },
+    {
+      "id": "0f8d04bf-4cdf-4be4-abc9-ccd38be919ae",
+      "sourceIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "direction": "forward",
+      "label": "Human",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 907.5,
+        "y": 207
+      }
+    },
+    {
+      "id": "8eeea7aa-b65a-431f-bf31-9aede2055054",
+      "sourceIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "direction": "forward",
+      "label": "Hybrid",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 921.5,
+        "y": 423
+      }
+    },
+    {
+      "id": "3458412e-0fd6-4c25-ab91-7789f3bd0b2a",
+      "sourceIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 919.5,
+        "y": 615
+      }
     }
   ],
   "roads": [],
