@@ -25,9 +25,30 @@
       "name": "Visual Elements",
       "position": {
         "x": 704,
-        "y": 431
+        "y": 430
       },
-      "cities": [],
+      "cities": [
+        {
+          "id": "a58ca88e-8e3f-4274-854d-64d52c36e7c9",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Color",
+          "position": {
+            "x": 765,
+            "y": 288
+          },
+          "paperIds": []
+        },
+        {
+          "id": "f0713606-bfa8-416f-879b-e531a32bb01d",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Saturation",
+          "position": {
+            "x": 844,
+            "y": 396
+          },
+          "paperIds": []
+        }
+      ],
       "color": "#b5e48c"
     },
     {
