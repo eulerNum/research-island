@@ -209,7 +209,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .append('path')
       .attr('class', (d) => `road road-${d.direction}`)
       .attr('fill', 'none')
-      .attr('stroke', (d) => (d.direction === 'forward' ? '#2a9d8f' : '#e76f51'))
+      .attr('stroke', (d) => d.color ?? (d.direction === 'forward' ? '#2a9d8f' : '#e76f51'))
       .attr('stroke-width', 2.5)
       .attr('stroke-dasharray', '9,9')
       .attr('pointer-events', 'none')

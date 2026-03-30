@@ -190,7 +190,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .append('path')
       .attr('class', (d) => `bridge bridge-${d.direction}`)
       .attr('fill', 'none')
-      .attr('stroke', (d) => (d.direction === 'forward' ? '#2a9d8f' : '#e76f51'))
+      .attr('stroke', (d) => d.color ?? (d.direction === 'forward' ? '#2a9d8f' : '#e76f51'))
       .attr('stroke-width', 3)
       .attr('stroke-dasharray', '12,12')
       .attr('pointer-events', 'none');

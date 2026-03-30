@@ -58,6 +58,7 @@ export interface Bridge {
   targetIslandId: string;
   direction: BridgeDirection;
   label?: string;
+  color?: string;
   paperIds: string[];
   gapIds: string[];
 }
@@ -72,6 +73,7 @@ export interface Road {
   targetCityId: string;
   direction: RoadDirection;
   label?: string;
+  color?: string;
   paperIds: string[];
   gapIds: string[];
 }

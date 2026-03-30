@@ -86,7 +86,7 @@ export default function DetailPanel({
 
   const entityType = bridge ? 'Bridge' : 'Road';
   const gapIds = entity.gapIds;
-  const dirColor = entity.direction === 'forward' ? '#2a9d8f' : '#e76f51';
+  const dirColor = entity.color ?? (entity.direction === 'forward' ? '#2a9d8f' : '#e76f51');
 
   return (
     <aside

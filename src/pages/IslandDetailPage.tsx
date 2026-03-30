@@ -170,6 +170,15 @@ export default function IslandDetailPage() {
         },
       });
       items.push({
+        label: '색상 변경',
+        onClick: () => {
+          const colors = ['#2a9d8f', '#e76f51', '#457b9d', '#e9c46a', '#f4a261', '#264653', '#a855f7', '#ef4444', '#06b6d4', '#84cc16'];
+          const currentIdx = colors.indexOf(road.color ?? '');
+          const nextColor = colors[(currentIdx + 1) % colors.length];
+          ctx.updateRoad({ ...road, color: nextColor });
+        },
+      });
+      items.push({
         label: `방향 전환 → ${road.direction === 'forward' ? 'backward' : 'forward'}`,
         color: road.direction === 'forward' ? '#e76f51' : '#2a9d8f',
         onClick: () => {
