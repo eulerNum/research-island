@@ -7,6 +7,9 @@ import Sidebar from '../components/Sidebar';
 import IslandMap from '../components/IslandMap';
 import DetailPanel from '../components/DetailPanel';
 import PromptDialog from '../components/PromptDialog';
+import ContextMenu from '../components/ContextMenu';
+import type { ContextMenuItem } from '../components/ContextMenu';
+import type { MapContextMenuEvent } from '../components/IslandMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
 
 const ISLAND_COLORS = ['#8ecae6', '#a8dadc', '#b5e48c', '#ffd166', '#e8c1a0', '#d4a5a5'];
@@ -34,10 +37,12 @@ export default function OverviewPage() {
     return param;
   });
   const [highlightedPaperId, setHighlightedPaperId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
     defaultValue?: string;
-    onConfirm: (value: string) => void;
+    showDirection?: boolean;
+    onConfirm: (value: string, direction?: 'forward' | 'backward') => void;
   } | null>(null);
 
   const handleIslandClick = useCallback(
@@ -53,8 +58,9 @@ export default function OverviewPage() {
             setPromptDialog({
               title: '다리 이름 (Bridge label)',
               defaultValue: `${sourceName} → ${targetName}: `,
-              onConfirm: (label: string) => {
-                ctx.addBridge(sourceId, islandId, 'forward', label);
+              showDirection: true,
+              onConfirm: (label: string, direction?: 'forward' | 'backward') => {
+                ctx.addBridge(sourceId, islandId, direction ?? 'forward', label);
                 setPromptDialog(null);
               },
             });
@@ -116,6 +122,78 @@ export default function OverviewPage() {
     navigate(`/island/${islandId}?road=${roadId}`);
   }, [navigate]);
 
+  const handleContextMenu = useCallback((event: MapContextMenuEvent) => {
+    const items: ContextMenuItem[] = [];
+    if (event.type === 'island') {
+      const island = ctx.mapData.islands.find((i) => i.id === event.id);
+      if (!island) return;
+      items.push({
+        label: `이름 변경: ${island.name}`,
+        onClick: () => {
+          setPromptDialog({
+            title: '섬 이름 변경',
+            defaultValue: island.name,
+            onConfirm: (name: string) => {
+              ctx.updateIsland({ ...island, name });
+              setPromptDialog(null);
+            },
+          });
+        },
+      });
+      items.push({
+        label: '삭제',
+        color: '#dc3545',
+        onClick: () => {
+          const cityCount = island.cities.length;
+          const msg = cityCount > 0
+            ? `"${island.name}" 섬과 도시 ${cityCount}개, 관련 다리/도로가 모두 삭제됩니다. 계속할까요?`
+            : `"${island.name}" 섬을 삭제할까요?`;
+          if (confirm(msg)) {
+            ctx.deleteIsland(island.id);
+            setSelectedBridgeId(null);
+          }
+        },
+      });
+    } else if (event.type === 'bridge') {
+      const bridge = ctx.mapData.bridges.find((b) => b.id === event.id);
+      if (!bridge) return;
+      items.push({
+        label: `라벨 변경: ${bridge.label ?? '(없음)'}`,
+        onClick: () => {
+          setPromptDialog({
+            title: '다리 라벨 변경',
+            defaultValue: bridge.label ?? '',
+            onConfirm: (label: string) => {
+              ctx.updateBridge({ ...bridge, label });
+              setPromptDialog(null);
+            },
+          });
+        },
+      });
+      items.push({
+        label: `방향 전환 → ${bridge.direction === 'forward' ? 'backward' : 'forward'}`,
+        color: bridge.direction === 'forward' ? '#e76f51' : '#2a9d8f',
+        onClick: () => {
+          ctx.updateBridge({
+            ...bridge,
+            direction: bridge.direction === 'forward' ? 'backward' : 'forward',
+          });
+        },
+      });
+      items.push({
+        label: '삭제',
+        color: '#dc3545',
+        onClick: () => {
+          if (confirm(`이 다리를 삭제할까요?`)) {
+            ctx.deleteBridge(bridge.id);
+            if (selectedBridgeId === bridge.id) setSelectedBridgeId(null);
+          }
+        },
+      });
+    }
+    setContextMenu({ x: event.screenX, y: event.screenY, items });
+  }, [ctx, selectedBridgeId]);
+
   const selectedBridge = selectedBridgeId
     ? ctx.mapData.bridges.find((b) => b.id === selectedBridgeId)
     : undefined;
@@ -142,6 +220,7 @@ export default function OverviewPage() {
             onBridgeClick={handleBridgeClick}
             onCanvasClick={handleCanvasClick}
             onIslandDragEnd={handleIslandDragEnd}
+            onContextMenu={handleContextMenu}
           />
         </main>
         {selectedBridge && (
@@ -158,6 +237,8 @@ export default function OverviewPage() {
               ctx.addPaperToBridge(actualId, selectedBridge.id);
             }}
             onUpdatePaper={ctx.updatePaper}
+            onRemovePaper={(paperId) => ctx.removePaperFromBridge(paperId, selectedBridge.id)}
+            onDeletePaper={ctx.deletePaper}
             onAddGap={(gap) => {
               ctx.addGap(gap);
               ctx.addGapToBridge(gap.id, selectedBridge.id);
@@ -170,10 +251,19 @@ export default function OverviewPage() {
           />
         )}
       </div>
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
       {promptDialog && (
         <PromptDialog
           title={promptDialog.title}
           defaultValue={promptDialog.defaultValue}
+          showDirection={promptDialog.showDirection}
           onConfirm={promptDialog.onConfirm}
           onCancel={() => setPromptDialog(null)}
         />

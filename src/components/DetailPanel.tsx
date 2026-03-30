@@ -25,6 +25,8 @@ interface DetailPanelProps {
   onUpdatePaper?: (paper: Paper) => void;
   onAddGap: (gap: ResearchGap) => void;
   onDeleteGap: (gapId: string) => void;
+  onRemovePaper?: (paperId: string) => void;
+  onDeletePaper?: (paperId: string) => void;
   onHighlightPaper?: (paperId: string | null) => void;
   onNavigateToBridge?: (bridgeId: string) => void;
   onNavigateToRoad?: (roadId: string, islandId: string) => void;
@@ -44,6 +46,8 @@ export default function DetailPanel({
   onUpdatePaper,
   onAddGap,
   onDeleteGap,
+  onRemovePaper,
+  onDeletePaper,
   onHighlightPaper,
   onNavigateToBridge,
   onNavigateToRoad,
@@ -146,34 +150,75 @@ export default function DetailPanel({
                 onMouseLeave={() => { if (!pinnedPaperId) onHighlightPaper?.(null); }}
               >
                 <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>
+                  <span style={{ flex: 1 }}>
                     {paper.title}{' '}
                     <span style={{ fontWeight: 'normal', color: '#888' }}>({paper.year})</span>
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isPinned) {
-                        setPinnedPaperId(null);
-                        onHighlightPaper?.(null);
-                      } else {
-                        setPinnedPaperId(paper.id);
-                        onHighlightPaper?.(paper.id);
-                      }
-                    }}
-                    title={isPinned ? '하이라이트 해제' : '하이라이트 고정'}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontSize: '0.9rem',
-                      color: isPinned ? '#ffd700' : '#ccc',
-                      padding: '0 2px',
-                      flexShrink: 0,
-                    }}
-                  >
-                    {isPinned ? '\u2605' : '\u2606'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (isPinned) {
+                          setPinnedPaperId(null);
+                          onHighlightPaper?.(null);
+                        } else {
+                          setPinnedPaperId(paper.id);
+                          onHighlightPaper?.(paper.id);
+                        }
+                      }}
+                      title={isPinned ? '하이라이트 해제' : '하이라이트 고정'}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.9rem',
+                        color: isPinned ? '#ffd700' : '#ccc',
+                        padding: '0 2px',
+                      }}
+                    >
+                      {isPinned ? '\u2605' : '\u2606'}
+                    </button>
+                    {onRemovePaper && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemovePaper(paper.id);
+                        }}
+                        title="이 다리/도로에서 연결 해제"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          color: '#aaa',
+                          padding: '0 2px',
+                        }}
+                      >
+                        &#x2715;
+                      </button>
+                    )}
+                    {onDeletePaper && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm(`"${paper.title}" 논문을 맵 전체에서 삭제할까요?`)) {
+                            onDeletePaper(paper.id);
+                          }
+                        }}
+                        title="맵 전체에서 논문 삭제"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          color: '#dc3545',
+                          padding: '0 2px',
+                        }}
+                      >
+                        &#x1F5D1;
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {paper.authors.length > 0 && (
                   <div style={{ color: '#666', fontSize: '0.8rem', marginTop: 2 }}>

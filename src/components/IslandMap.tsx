@@ -3,6 +3,13 @@ import * as d3 from 'd3';
 import type { ResearchMap, Island } from '../services/types';
 import type { ToolbarMode } from '../hooks/useToolbar';
 
+export interface MapContextMenuEvent {
+  type: 'island' | 'bridge';
+  id: string;
+  screenX: number;
+  screenY: number;
+}
+
 interface IslandMapProps {
   data: ResearchMap;
   mode: ToolbarMode;
@@ -12,6 +19,7 @@ interface IslandMapProps {
   onBridgeClick: (bridgeId: string) => void;
   onCanvasClick: (position: { x: number; y: number }) => void;
   onIslandDragEnd: (islandId: string, position: { x: number; y: number }) => void;
+  onContextMenu?: (event: MapContextMenuEvent) => void;
 }
 
 interface SimNode extends d3.SimulationNodeDatum {
@@ -27,6 +35,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
   onBridgeClick,
   onCanvasClick,
   onIslandDragEnd,
+  onContextMenu,
 }, ref) {
   const svgRef = useRef<SVGSVGElement>(null);
   useImperativeHandle(ref, () => svgRef.current!, []);
@@ -39,6 +48,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
   const onCanvasClickRef = useRef(onCanvasClick);
   const onIslandDragEndRef = useRef(onIslandDragEnd);
   const connectionStartRef = useRef(connectionStart);
+  const onContextMenuRef = useRef(onContextMenu);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -47,6 +57,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
     onCanvasClickRef.current = onCanvasClick;
     onIslandDragEndRef.current = onIslandDragEnd;
     connectionStartRef.current = connectionStart;
+    onContextMenuRef.current = onContextMenu;
   });
 
   useEffect(() => {
@@ -159,6 +170,11 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .on('click', (_event, d) => {
         _event.stopPropagation();
         onBridgeClickRef.current(d.id);
+      })
+      .on('contextmenu', (_event: MouseEvent, d) => {
+        _event.preventDefault();
+        _event.stopPropagation();
+        onContextMenuRef.current?.({ type: 'bridge', id: d.id, screenX: _event.clientX, screenY: _event.clientY });
       });
 
     // Invisible wide hit area for easy clicking
@@ -190,6 +206,11 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .on('click', (_event, d) => {
         _event.stopPropagation();
         onIslandClickRef.current(d.island.id);
+      })
+      .on('contextmenu', (_event: MouseEvent, d) => {
+        _event.preventDefault();
+        _event.stopPropagation();
+        onContextMenuRef.current?.({ type: 'island', id: d.island.id, screenX: _event.clientX, screenY: _event.clientY });
       });
 
     islandGroups

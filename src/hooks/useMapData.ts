@@ -238,6 +238,32 @@ export function useMapData() {
     [refresh],
   );
 
+  const removePaperFromBridge = useCallback(
+    (paperId: string, bridgeId: string) => {
+      const map = mapService.getFullMap();
+      const bridge = map.bridges.find((b) => b.id === bridgeId);
+      if (bridge) {
+        bridge.paperIds = bridge.paperIds.filter((id) => id !== paperId);
+        mapService.updateBridge(bridge);
+        refresh();
+      }
+    },
+    [refresh],
+  );
+
+  const removePaperFromRoad = useCallback(
+    (paperId: string, roadId: string) => {
+      const map = mapService.getFullMap();
+      const road = map.roads.find((r) => r.id === roadId);
+      if (road) {
+        road.paperIds = road.paperIds.filter((id) => id !== paperId);
+        mapService.updateRoad(road);
+        refresh();
+      }
+    },
+    [refresh],
+  );
+
   // ─── Gaps ───────────────────────────────────────────────
 
   const addGap = useCallback(
@@ -329,6 +355,8 @@ export function useMapData() {
       deletePaper,
       addPaperToBridge,
       addPaperToRoad,
+      removePaperFromBridge,
+      removePaperFromRoad,
       addGap,
       deleteGap,
       addGapToBridge,
@@ -343,6 +371,7 @@ export function useMapData() {
       addBridge, updateBridge, deleteBridge,
       addRoad, updateRoad, deleteRoad,
       addPaper, updatePaper, deletePaper, addPaperToBridge, addPaperToRoad,
+      removePaperFromBridge, removePaperFromRoad,
       addGap, deleteGap, addGapToBridge, addGapToRoad,
       importMap, saveToGitHub, loadFromGitHub,
     ],

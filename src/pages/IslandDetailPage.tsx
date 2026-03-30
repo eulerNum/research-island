@@ -6,6 +6,9 @@ import Toolbar from '../components/Toolbar';
 import CityMap from '../components/CityMap';
 import DetailPanel from '../components/DetailPanel';
 import PromptDialog from '../components/PromptDialog';
+import ContextMenu from '../components/ContextMenu';
+import type { ContextMenuItem } from '../components/ContextMenu';
+import type { CityMapContextMenuEvent } from '../components/CityMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
 
 const DETAIL_MODES: ToolbarMode[] = ['select', 'add-city', 'road-connect'];
@@ -27,10 +30,12 @@ export default function IslandDetailPage() {
     return param;
   });
   const [highlightedPaperId, setHighlightedPaperId] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
     defaultValue?: string;
-    onConfirm: (value: string) => void;
+    showDirection?: boolean;
+    onConfirm: (value: string, direction?: 'forward' | 'backward') => void;
   } | null>(null);
 
   const island = ctx.mapData.islands.find((i) => i.id === id);
@@ -56,8 +61,9 @@ export default function IslandDetailPage() {
             setPromptDialog({
               title: '도로 이름 (Road label)',
               defaultValue: `${sourceName} → ${targetName}: `,
-              onConfirm: (label: string) => {
-                ctx.addRoad(sourceId, cityId, 'forward', label);
+              showDirection: true,
+              onConfirm: (label: string, direction?: 'forward' | 'backward') => {
+                ctx.addRoad(sourceId, cityId, direction ?? 'forward', label);
                 setPromptDialog(null);
               },
             });
@@ -121,6 +127,74 @@ export default function IslandDetailPage() {
     }
   }, [id, navigate]);
 
+  const handleContextMenu = useCallback((event: CityMapContextMenuEvent) => {
+    const items: ContextMenuItem[] = [];
+    if (event.type === 'city') {
+      const city = island?.cities.find((c) => c.id === event.id);
+      if (!city || !id) return;
+      items.push({
+        label: `이름 변경: ${city.name}`,
+        onClick: () => {
+          setPromptDialog({
+            title: '도시 이름 변경',
+            defaultValue: city.name,
+            onConfirm: (name: string) => {
+              ctx.updateCity(id, { ...city, name });
+              setPromptDialog(null);
+            },
+          });
+        },
+      });
+      items.push({
+        label: '삭제',
+        color: '#dc3545',
+        onClick: () => {
+          if (confirm(`"${city.name}" 도시와 관련 도로가 모두 삭제됩니다. 계속할까요?`)) {
+            ctx.deleteCity(id, city.id);
+            setSelectedRoadId(null);
+          }
+        },
+      });
+    } else if (event.type === 'road') {
+      const road = ctx.mapData.roads.find((r) => r.id === event.id);
+      if (!road) return;
+      items.push({
+        label: `라벨 변경: ${road.label ?? '(없음)'}`,
+        onClick: () => {
+          setPromptDialog({
+            title: '도로 라벨 변경',
+            defaultValue: road.label ?? '',
+            onConfirm: (label: string) => {
+              ctx.updateRoad({ ...road, label });
+              setPromptDialog(null);
+            },
+          });
+        },
+      });
+      items.push({
+        label: `방향 전환 → ${road.direction === 'forward' ? 'backward' : 'forward'}`,
+        color: road.direction === 'forward' ? '#e76f51' : '#2a9d8f',
+        onClick: () => {
+          ctx.updateRoad({
+            ...road,
+            direction: road.direction === 'forward' ? 'backward' : 'forward',
+          });
+        },
+      });
+      items.push({
+        label: '삭제',
+        color: '#dc3545',
+        onClick: () => {
+          if (confirm(`이 도로를 삭제할까요?`)) {
+            ctx.deleteRoad(road.id);
+            if (selectedRoadId === road.id) setSelectedRoadId(null);
+          }
+        },
+      });
+    }
+    setContextMenu({ x: event.screenX, y: event.screenY, items });
+  }, [ctx, island?.cities, id, selectedRoadId]);
+
   if (!island) return <Navigate to="/" replace />;
 
   const selectedRoad = selectedRoadId
@@ -183,6 +257,7 @@ export default function IslandDetailPage() {
             onRoadClick={handleRoadClick}
             onCanvasClick={handleCanvasClick}
             onCityDragEnd={handleCityDragEnd}
+            onContextMenu={handleContextMenu}
           />
         </div>
         {selectedRoad && (
@@ -199,6 +274,8 @@ export default function IslandDetailPage() {
               ctx.addPaperToRoad(actualId, selectedRoad.id);
             }}
             onUpdatePaper={ctx.updatePaper}
+            onRemovePaper={(paperId) => ctx.removePaperFromRoad(paperId, selectedRoad.id)}
+            onDeletePaper={ctx.deletePaper}
             onAddGap={(gap) => {
               ctx.addGap(gap);
               ctx.addGapToRoad(gap.id, selectedRoad.id);
@@ -211,10 +288,19 @@ export default function IslandDetailPage() {
           />
         )}
       </div>
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          items={contextMenu.items}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
       {promptDialog && (
         <PromptDialog
           title={promptDialog.title}
           defaultValue={promptDialog.defaultValue}
+          showDirection={promptDialog.showDirection}
           onConfirm={promptDialog.onConfirm}
           onCancel={() => setPromptDialog(null)}
         />

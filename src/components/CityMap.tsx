@@ -3,6 +3,13 @@ import * as d3 from 'd3';
 import type { Island, Road } from '../services/types';
 import type { ToolbarMode } from '../hooks/useToolbar';
 
+export interface CityMapContextMenuEvent {
+  type: 'city' | 'road';
+  id: string;
+  screenX: number;
+  screenY: number;
+}
+
 interface CityMapProps {
   island: Island;
   roads: Road[];
@@ -13,6 +20,7 @@ interface CityMapProps {
   onRoadClick: (roadId: string) => void;
   onCanvasClick: (position: { x: number; y: number }) => void;
   onCityDragEnd: (cityId: string, position: { x: number; y: number }) => void;
+  onContextMenu?: (event: CityMapContextMenuEvent) => void;
 }
 
 const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
@@ -25,6 +33,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
   onRoadClick,
   onCanvasClick,
   onCityDragEnd,
+  onContextMenu,
 }, ref) {
   const svgRef = useRef<SVGSVGElement>(null);
   useImperativeHandle(ref, () => svgRef.current!, []);
@@ -34,6 +43,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
   const onRoadClickRef = useRef(onRoadClick);
   const onCanvasClickRef = useRef(onCanvasClick);
   const onCityDragEndRef = useRef(onCityDragEnd);
+  const onContextMenuRef = useRef(onContextMenu);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -41,6 +51,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
     onRoadClickRef.current = onRoadClick;
     onCanvasClickRef.current = onCanvasClick;
     onCityDragEndRef.current = onCityDragEnd;
+    onContextMenuRef.current = onContextMenu;
   });
 
   useEffect(() => {
@@ -179,6 +190,11 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .on('click', (_event, d) => {
         _event.stopPropagation();
         onRoadClickRef.current(d.id);
+      })
+      .on('contextmenu', (_event: MouseEvent, d) => {
+        _event.preventDefault();
+        _event.stopPropagation();
+        onContextMenuRef.current?.({ type: 'road', id: d.id, screenX: _event.clientX, screenY: _event.clientY });
       });
 
     roadGroups
@@ -211,6 +227,11 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .on('click', (_event, d) => {
         _event.stopPropagation();
         onCityClickRef.current(d.city.id);
+      })
+      .on('contextmenu', (_event: MouseEvent, d) => {
+        _event.preventDefault();
+        _event.stopPropagation();
+        onContextMenuRef.current?.({ type: 'city', id: d.city.id, screenX: _event.clientX, screenY: _event.clientY });
       });
 
     const baseColor = island.color ?? '#8ecae6';
