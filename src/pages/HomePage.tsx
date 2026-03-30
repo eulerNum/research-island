@@ -191,9 +191,26 @@ export default function HomePage() {
             borderRadius: 8,
             marginBottom: 20,
             fontSize: '0.85rem',
+            textAlign: 'center',
           }}
         >
           {error}
+          <button
+            onClick={() => setShowGitHubSettings(true)}
+            style={{
+              display: 'block',
+              margin: '10px auto 0',
+              padding: '6px 16px',
+              border: 'none',
+              borderRadius: 6,
+              background: 'var(--accent-forward)',
+              color: '#fff',
+              cursor: 'pointer',
+              fontSize: '0.8rem',
+            }}
+          >
+            GitHub 설정 변경
+          </button>
         </div>
       )}
 
