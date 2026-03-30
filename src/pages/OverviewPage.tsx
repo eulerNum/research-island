@@ -8,7 +8,7 @@ import IslandMap from '../components/IslandMap';
 import DetailPanel from '../components/DetailPanel';
 import PromptDialog from '../components/PromptDialog';
 import ContextMenu from '../components/ContextMenu';
-import type { ContextMenuItem } from '../components/ContextMenu';
+import type { ContextMenuItem, ContextMenuPaletteItem } from '../components/ContextMenu';
 import type { MapContextMenuEvent } from '../components/IslandMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
 
@@ -139,14 +139,14 @@ export default function OverviewPage() {
         },
       });
       items.push({
-        label: '색상 변경',
-        onClick: () => {
-          const colors = ['#8ecae6', '#a8dadc', '#b5e48c', '#ffd166', '#e8c1a0', '#d4a5a5', '#c9b1ff', '#ffb3b3', '#90e0ef', '#dda15e'];
-          const currentIdx = colors.indexOf(island.color ?? '');
-          const nextColor = colors[(currentIdx + 1) % colors.length];
-          ctx.updateIsland({ ...island, color: nextColor });
+        type: 'palette',
+        label: '섬 색상',
+        colors: ['#8ecae6', '#a8dadc', '#b5e48c', '#ffd166', '#e8c1a0', '#d4a5a5', '#c9b1ff', '#ffb3b3', '#90e0ef', '#dda15e'],
+        currentColor: island.color,
+        onSelect: (color: string) => {
+          ctx.updateIsland({ ...island, color });
         },
-      });
+      } satisfies ContextMenuPaletteItem);
       items.push({
         label: '삭제',
         color: '#dc3545',
@@ -178,14 +178,14 @@ export default function OverviewPage() {
         },
       });
       items.push({
-        label: '색상 변경',
-        onClick: () => {
-          const colors = ['#2a9d8f', '#e76f51', '#457b9d', '#e9c46a', '#f4a261', '#264653', '#a855f7', '#ef4444', '#06b6d4', '#84cc16'];
-          const currentIdx = colors.indexOf(bridge.color ?? '');
-          const nextColor = colors[(currentIdx + 1) % colors.length];
-          ctx.updateBridge({ ...bridge, color: nextColor });
+        type: 'palette',
+        label: '다리 색상',
+        colors: ['#2a9d8f', '#e76f51', '#457b9d', '#e9c46a', '#f4a261', '#264653', '#a855f7', '#ef4444', '#06b6d4', '#84cc16'],
+        currentColor: bridge.color,
+        onSelect: (color: string) => {
+          ctx.updateBridge({ ...bridge, color });
         },
-      });
+      } satisfies ContextMenuPaletteItem);
       items.push({
         label: `방향 전환 → ${bridge.direction === 'forward' ? 'backward' : 'forward'}`,
         color: bridge.direction === 'forward' ? '#e76f51' : '#2a9d8f',

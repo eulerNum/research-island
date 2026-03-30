@@ -7,7 +7,7 @@ import CityMap from '../components/CityMap';
 import DetailPanel from '../components/DetailPanel';
 import PromptDialog from '../components/PromptDialog';
 import ContextMenu from '../components/ContextMenu';
-import type { ContextMenuItem } from '../components/ContextMenu';
+import type { ContextMenuItem, ContextMenuPaletteItem } from '../components/ContextMenu';
 import type { CityMapContextMenuEvent } from '../components/CityMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
 
@@ -170,14 +170,14 @@ export default function IslandDetailPage() {
         },
       });
       items.push({
-        label: '색상 변경',
-        onClick: () => {
-          const colors = ['#2a9d8f', '#e76f51', '#457b9d', '#e9c46a', '#f4a261', '#264653', '#a855f7', '#ef4444', '#06b6d4', '#84cc16'];
-          const currentIdx = colors.indexOf(road.color ?? '');
-          const nextColor = colors[(currentIdx + 1) % colors.length];
-          ctx.updateRoad({ ...road, color: nextColor });
+        type: 'palette',
+        label: '도로 색상',
+        colors: ['#2a9d8f', '#e76f51', '#457b9d', '#e9c46a', '#f4a261', '#264653', '#a855f7', '#ef4444', '#06b6d4', '#84cc16'],
+        currentColor: road.color,
+        onSelect: (color: string) => {
+          ctx.updateRoad({ ...road, color });
         },
-      });
+      } satisfies ContextMenuPaletteItem);
       items.push({
         label: `방향 전환 → ${road.direction === 'forward' ? 'backward' : 'forward'}`,
         color: road.direction === 'forward' ? '#e76f51' : '#2a9d8f',
