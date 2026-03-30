@@ -14,8 +14,8 @@
       "id": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
       "name": "Flavors",
       "position": {
-        "x": 404.5975341796875,
-        "y": 576.6016235351562
+        "x": 391.4024658203125,
+        "y": 568.9044799804688
       },
       "cities": [],
       "color": "#a8dadc"
@@ -44,8 +44,8 @@
       "id": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
       "name": "Emotions",
       "position": {
-        "x": 395,
-        "y": 181
+        "x": 405.9959411621094,
+        "y": 187.5975341796875
       },
       "cities": [],
       "color": "#e8c1a0"
@@ -60,7 +60,11 @@
       "label": "Sensory",
       "paperIds": [],
       "gapIds": [],
-      "color": "#ef4444"
+      "color": "#ef4444",
+      "controlPoint": {
+        "x": 307.495849609375,
+        "y": 474.0657043457031
+      }
     },
     {
       "id": "c6ef6665-51bb-4b66-a80e-d8865d0d5111",
@@ -70,7 +74,11 @@
       "label": "Sensory",
       "paperIds": [],
       "gapIds": [],
-      "color": "#ef4444"
+      "color": "#ef4444",
+      "controlPoint": {
+        "x": 191.33973693847656,
+        "y": 290.3088607788086
+      }
     },
     {
       "id": "5441b6c0-0dd7-44d2-813a-cb607c58af8e",
@@ -80,7 +88,11 @@
       "label": "Sensory",
       "paperIds": [],
       "gapIds": [],
-      "color": "#ef4444"
+      "color": "#ef4444",
+      "controlPoint": {
+        "x": 404.102783203125,
+        "y": 331.346923828125
+      }
     },
     {
       "id": "0f8d04bf-4cdf-4be4-abc9-ccd38be919ae",
@@ -91,8 +103,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 905.5,
-        "y": 307
+        "x": 915.924560546875,
+        "y": 340.2452392578125
       }
     },
     {
@@ -118,8 +130,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 893.5,
-        "y": 563
+        "x": 931.31884765625,
+        "y": 500.785400390625
       },
       "color": "#a855f7"
     },
@@ -158,8 +170,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 689.7012329101562,
-        "y": 640.1991882324219
+        "x": 645.1604614257812,
+        "y": 623.5124206542969
       },
       "color": "#a855f7"
     },
@@ -172,8 +184,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 171.5,
-        "y": 691
+        "x": 221.72787475585938,
+        "y": 544.4394226074219
       },
       "color": "#a855f7"
     },
@@ -187,8 +199,8 @@
       "gapIds": [],
       "color": "#a855f7",
       "controlPoint": {
-        "x": 409.5,
-        "y": 560.5
+        "x": 406.30194091796875,
+        "y": 502.8829345703125
       }
     },
     {
@@ -200,8 +212,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 845.5,
-        "y": 803.5
+        "x": 564.2128295898438,
+        "y": 700.6828308105469
       },
       "color": "#a855f7"
     },
@@ -242,10 +254,24 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 637,
-        "y": 1086.5
+        "x": 481.49609375,
+        "y": 934.121337890625
       },
       "color": "#a855f7"
+    },
+    {
+      "id": "4600e7d6-dded-4b96-88c2-02ece47ed729",
+      "sourceIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "targetIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "direction": "forward",
+      "label": "Sensory",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 595,
+        "y": 138.5
+      },
+      "color": "#ef4444"
     }
   ],
   "roads": [],
