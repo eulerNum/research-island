@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type {
   ResearchMap,
   Island,
@@ -332,10 +332,39 @@ export function useMapData() {
     refresh();
   }, [refresh]);
 
+  // ─── Undo / Redo ────────────────────────────────────────
+
+  const handleUndo = useCallback(() => {
+    if (mapService.undo()) refresh();
+  }, [refresh]);
+
+  const handleRedo = useCallback(() => {
+    if (mapService.redo()) refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === 'y' || (e.key === 'z' && e.shiftKey))
+      ) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleUndo, handleRedo]);
+
   return useMemo(
     () => ({
       mapData,
       refresh,
+      undo: handleUndo,
+      redo: handleRedo,
       addIsland,
       updateIsland,
       saveIslandPosition,
@@ -366,7 +395,8 @@ export function useMapData() {
       loadFromGitHub,
     }),
     [
-      mapData, refresh, addIsland, updateIsland, saveIslandPosition, deleteIsland,
+      mapData, refresh, handleUndo, handleRedo,
+      addIsland, updateIsland, saveIslandPosition, deleteIsland,
       addCity, updateCity, saveCityPosition, deleteCity,
       addBridge, updateBridge, deleteBridge,
       addRoad, updateRoad, deleteRoad,

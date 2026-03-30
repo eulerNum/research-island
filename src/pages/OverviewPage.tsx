@@ -139,6 +139,15 @@ export default function OverviewPage() {
         },
       });
       items.push({
+        label: '색상 변경',
+        onClick: () => {
+          const colors = ['#8ecae6', '#a8dadc', '#b5e48c', '#ffd166', '#e8c1a0', '#d4a5a5', '#c9b1ff', '#ffb3b3', '#90e0ef', '#dda15e'];
+          const currentIdx = colors.indexOf(island.color ?? '');
+          const nextColor = colors[(currentIdx + 1) % colors.length];
+          ctx.updateIsland({ ...island, color: nextColor });
+        },
+      });
+      items.push({
         label: '삭제',
         color: '#dc3545',
         onClick: () => {
