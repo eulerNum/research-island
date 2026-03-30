@@ -1,0 +1,17 @@
+{
+  "maps": [
+    {
+      "id": "19dbe3f8-4844-475c-a1d8-129a4e5c5ad4",
+      "name": "맛의 시각화",
+      "description": "오뚜기 연구",
+      "pinHash": "cc0ff843d1c33686df46885ec7c47208a87834d376f83d439849e305773a139f",
+      "createdAt": "2026-03-30T22:41:09.786Z",
+      "updatedAt": "2026-03-30T22:41:09.786Z",
+      "stats": {
+        "islands": 0,
+        "bridges": 0,
+        "papers": 0
+      }
+    }
+  ]
+}
