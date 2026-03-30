@@ -14,8 +14,8 @@
       "id": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
       "name": "Flavors",
       "position": {
-        "x": 416,
-        "y": 694
+        "x": 417,
+        "y": 607
       },
       "cities": [],
       "color": "#a8dadc"
@@ -44,8 +44,8 @@
       "id": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
       "name": "Emotions",
       "position": {
-        "x": 405,
-        "y": 171
+        "x": 395,
+        "y": 181
       },
       "cities": [],
       "color": "#e8c1a0"
@@ -145,6 +145,104 @@
         "x": 632,
         "y": 591.5
       }
+    },
+    {
+      "id": "877f8c01-0e87-4c22-ba0e-5217b49061ce",
+      "sourceIslandId": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
+      "targetIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 700,
+        "y": 721.5
+      },
+      "color": "#e76f51"
+    },
+    {
+      "id": "f040bed5-4b27-4b3c-9a39-0d08e5b5af90",
+      "sourceIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "targetIslandId": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 171.5,
+        "y": 691
+      },
+      "color": "#e76f51"
+    },
+    {
+      "id": "6e59e417-1aa8-454a-bc31-fb1f257d29e2",
+      "sourceIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "targetIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "color": "#e76f51",
+      "controlPoint": {
+        "x": 409.5,
+        "y": 560.5
+      }
+    },
+    {
+      "id": "d92346ac-2954-4237-ad01-757ed16fb067",
+      "sourceIslandId": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
+      "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 845.5,
+        "y": 803.5
+      },
+      "color": "#e76f51"
+    },
+    {
+      "id": "47da6d00-fbb9-4d1a-b484-bd979b99cde6",
+      "sourceIslandId": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
+      "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 864,
+        "y": 18
+      },
+      "color": "#e76f51"
+    },
+    {
+      "id": "dd9c81ca-0721-45e5-967d-071e3fbeba77",
+      "sourceIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "targetIslandId": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 798,
+        "y": 96
+      },
+      "color": "#f4a261"
+    },
+    {
+      "id": "1006c5b6-c4b6-4c3c-a2f8-671150bbb2e6",
+      "sourceIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
+      "direction": "forward",
+      "label": "AI",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 637,
+        "y": 1086.5
+      },
+      "color": "#e76f51"
     }
   ],
   "roads": [],
