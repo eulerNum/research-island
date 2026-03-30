@@ -132,6 +132,19 @@
         "x": 523.7640380859375,
         "y": 502.4503173828125
       }
+    },
+    {
+      "id": "a99d4386-638c-419a-9ec0-61a7a7bc94d6",
+      "sourceIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "targetIslandId": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
+      "direction": "forward",
+      "label": "Cross-modal",
+      "paperIds": [],
+      "gapIds": [],
+      "controlPoint": {
+        "x": 632,
+        "y": 591.5
+      }
     }
   ],
   "roads": [],
