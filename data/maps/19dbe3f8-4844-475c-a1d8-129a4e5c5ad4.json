@@ -4,8 +4,8 @@
       "id": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
       "name": "Samples",
       "position": {
-        "x": 185,
-        "y": 205
+        "x": 117,
+        "y": 444
       },
       "cities": [],
       "color": "#8ecae6"
@@ -15,7 +15,7 @@
       "name": "Flavors",
       "position": {
         "x": 410,
-        "y": 206
+        "y": 671
       },
       "cities": [],
       "color": "#a8dadc"
@@ -24,8 +24,8 @@
       "id": "b8695f80-066b-4864-b740-795c5f03a1b9",
       "name": "Visual Elements",
       "position": {
-        "x": 267,
-        "y": 398
+        "x": 704,
+        "y": 431
       },
       "cities": [],
       "color": "#b5e48c"
@@ -34,8 +34,8 @@
       "id": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
       "name": "Images",
       "position": {
-        "x": 431,
-        "y": 400
+        "x": 1121,
+        "y": 435
       },
       "cities": [],
       "color": "#ffd166"
@@ -44,14 +44,42 @@
       "id": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
       "name": "Emotions",
       "position": {
-        "x": 266,
-        "y": 533
+        "x": 405,
+        "y": 171
       },
       "cities": [],
       "color": "#e8c1a0"
     }
   ],
-  "bridges": [],
+  "bridges": [
+    {
+      "id": "99fb6b9c-0862-447c-bde7-b4dfd6f7c6ae",
+      "sourceIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "targetIslandId": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
+      "direction": "forward",
+      "label": "Sensory",
+      "paperIds": [],
+      "gapIds": []
+    },
+    {
+      "id": "c6ef6665-51bb-4b66-a80e-d8865d0d5111",
+      "sourceIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "targetIslandId": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
+      "direction": "forward",
+      "label": "Sensory",
+      "paperIds": [],
+      "gapIds": []
+    },
+    {
+      "id": "5441b6c0-0dd7-44d2-813a-cb607c58af8e",
+      "sourceIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
+      "targetIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+      "direction": "forward",
+      "label": "Sensory",
+      "paperIds": [],
+      "gapIds": []
+    }
+  ],
   "roads": [],
   "papers": [],
   "gaps": []
