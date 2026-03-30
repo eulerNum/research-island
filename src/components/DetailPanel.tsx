@@ -54,6 +54,7 @@ export default function DetailPanel({
   onClose,
 }: DetailPanelProps) {
   const [showPaperForm, setShowPaperForm] = useState(false);
+  const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
   const [pinnedPaperId, setPinnedPaperId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
 
@@ -178,6 +179,26 @@ export default function DetailPanel({
                     >
                       {isPinned ? '\u2605' : '\u2606'}
                     </button>
+                    {onUpdatePaper && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingPaper(paper);
+                          setShowPaperForm(false);
+                        }}
+                        title="논문 편집"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          fontSize: '0.8rem',
+                          color: '#888',
+                          padding: '0 2px',
+                        }}
+                      >
+                        &#x270E;
+                      </button>
+                    )}
                     {onRemovePaper && (
                       <button
                         onClick={(e) => {
@@ -368,8 +389,23 @@ export default function DetailPanel({
           })}
         </div>
 
+        {/* Edit paper */}
+        {editingPaper && onUpdatePaper && (
+          <div style={{ marginTop: 8, padding: 8, background: '#f0f8ff', borderRadius: 6, border: '1px solid #b0d4f1' }}>
+            <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: 4, fontWeight: 600 }}>Edit Paper</div>
+            <PaperForm
+              initialPaper={editingPaper}
+              onSubmit={(paper) => {
+                onUpdatePaper(paper);
+                setEditingPaper(null);
+              }}
+              onCancel={() => setEditingPaper(null)}
+            />
+          </div>
+        )}
+
         {/* Add paper */}
-        {showPaperForm ? (
+        {!editingPaper && showPaperForm ? (
           <div style={{ marginTop: 8 }}>
             <PaperForm
               onSubmit={(paper) => {
@@ -379,7 +415,7 @@ export default function DetailPanel({
               onCancel={() => setShowPaperForm(false)}
             />
           </div>
-        ) : (
+        ) : !editingPaper ? (
           <button
             onClick={() => setShowPaperForm(true)}
             style={{
@@ -395,7 +431,7 @@ export default function DetailPanel({
           >
             + Add Paper
           </button>
-        )}
+        ) : null}
       </div>
 
       {lightbox && (

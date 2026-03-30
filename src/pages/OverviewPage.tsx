@@ -206,7 +206,7 @@ export default function OverviewPage() {
         svgRef={mapSvgRef}
       />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar data={ctx.mapData} />
+        <Sidebar data={ctx.mapData} highlightedPaperId={highlightedPaperId} onHighlightPaper={setHighlightedPaperId} />
         <main style={{ flex: 1, position: 'relative' }}>
           <IslandMap
             ref={mapSvgRef}

@@ -215,6 +215,51 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .attr('pointer-events', 'none')
       .attr('d', roadPath);
 
+    // Road labels at midpoint
+    function roadMidpoint(d: Road): { x: number; y: number } {
+      const s = cityMap.get(d.sourceCityId);
+      const t = cityMap.get(d.targetCityId);
+      if (!s || !t) return { x: 0, y: 0 };
+      const x1 = s.x, y1 = s.y, x2 = t.x, y2 = t.y;
+      const key = pairKey(d.sourceCityId, d.targetCityId);
+      const total = pairCountMap.get(key) ?? 1;
+      const idx = roadOffsets.get(d.id) ?? 0;
+      if (total <= 1) {
+        return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 8 };
+      }
+      const SPREAD = 35;
+      const offset = (idx - (total - 1) / 2) * SPREAD;
+      const [sortedA, sortedB] = [d.sourceCityId, d.targetCityId].sort();
+      const sA = cityMap.get(sortedA)!;
+      const sB = cityMap.get(sortedB)!;
+      const pdx = sB.x - sA.x;
+      const pdy = sB.y - sA.y;
+      const len = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
+      const nx = -pdy / len;
+      const ny = pdx / len;
+      const cpx = (x1 + x2) / 2 + nx * offset;
+      const cpy = (y1 + y2) / 2 + ny * offset;
+      return { x: 0.25 * x1 + 0.5 * cpx + 0.25 * x2, y: 0.25 * y1 + 0.5 * cpy + 0.25 * y2 - 8 };
+    }
+
+    roadGroups
+      .filter((d) => !!d.label)
+      .append('text')
+      .attr('class', 'road-label')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .attr('font-size', '10px')
+      .attr('fill', '#555')
+      .attr('pointer-events', 'none')
+      .each(function (d) {
+        const mid = roadMidpoint(d);
+        d3.select(this).attr('x', mid.x).attr('y', mid.y);
+      })
+      .text((d) => {
+        const label = d.label ?? '';
+        return label.length > 25 ? label.slice(0, 23) + '...' : label;
+      });
+
     // City nodes
     const cityGroups = g
       .selectAll<SVGGElement, (typeof cities)[0]>('.city-group')
@@ -272,9 +317,13 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
           'transform',
           `translate(${d.x},${d.y})`,
         );
-        // Update connected roads
+        // Update connected roads and labels
         g.selectAll<SVGPathElement, Road>('.road-hit').attr('d', roadPath);
         g.selectAll<SVGPathElement, Road>('.road').attr('d', roadPath);
+        g.selectAll<SVGTextElement, Road>('.road-label').each(function (rd) {
+          const mid = roadMidpoint(rd);
+          d3.select(this).attr('x', mid.x).attr('y', mid.y);
+        });
       })
       .on('end', (_event, d) => {
         onCityDragEndRef.current(d.city.id, { x: d.x, y: d.y });

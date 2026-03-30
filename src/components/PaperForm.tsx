@@ -3,6 +3,7 @@ import type { Paper } from '../services/types';
 import { generateId } from '../utils/idGenerator';
 
 interface PaperFormProps {
+  initialPaper?: Paper;
   onSubmit: (paper: Paper) => void;
   onCancel: () => void;
 }
@@ -17,15 +18,16 @@ function toDataUrl(blob: Blob): Promise<string> {
   });
 }
 
-export default function PaperForm({ onSubmit, onCancel }: PaperFormProps) {
-  const [title, setTitle] = useState('');
-  const [authors, setAuthors] = useState('');
-  const [year, setYear] = useState(new Date().getFullYear());
-  const [journal, setJournal] = useState('');
-  const [abstract, setAbstract] = useState('');
-  const [comment, setComment] = useState('');
-  const [url, setUrl] = useState('');
-  const [figures, setFigures] = useState<string[]>([]); // base64 data URLs
+export default function PaperForm({ initialPaper, onSubmit, onCancel }: PaperFormProps) {
+  const isEdit = !!initialPaper;
+  const [title, setTitle] = useState(initialPaper?.title ?? '');
+  const [authors, setAuthors] = useState(initialPaper?.authors.join(', ') ?? '');
+  const [year, setYear] = useState(initialPaper?.year ?? new Date().getFullYear());
+  const [journal, setJournal] = useState(initialPaper?.journal ?? '');
+  const [abstract, setAbstract] = useState(initialPaper?.abstract ?? '');
+  const [comment, setComment] = useState(initialPaper?.comment ?? '');
+  const [url, setUrl] = useState(initialPaper?.url ?? '');
+  const [figures, setFigures] = useState<string[]>(initialPaper?.figureUrls ?? []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addImages = useCallback(async (files: File[] | Blob[]) => {
@@ -73,7 +75,7 @@ export default function PaperForm({ onSubmit, onCancel }: PaperFormProps) {
     if (!title.trim() || !year) return;
 
     const paper: Paper = {
-      id: generateId(),
+      id: initialPaper?.id ?? generateId(),
       title: title.trim(),
       authors: authors
         .split(',')
@@ -85,8 +87,10 @@ export default function PaperForm({ onSubmit, onCancel }: PaperFormProps) {
       comment: comment.trim() || undefined,
       figureUrls: figures.length > 0 ? figures : undefined,
       url: url.trim() || undefined,
-      source: 'manual',
-      createdAt: new Date().toISOString(),
+      source: initialPaper?.source ?? 'manual',
+      createdAt: initialPaper?.createdAt ?? new Date().toISOString(),
+      semanticScholarId: initialPaper?.semanticScholarId,
+      citationCount: initialPaper?.citationCount,
     };
     onSubmit(paper);
   };
@@ -205,7 +209,7 @@ export default function PaperForm({ onSubmit, onCancel }: PaperFormProps) {
 
       <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
         <button type="submit" style={btnPrimary}>
-          Add Paper
+          {isEdit ? 'Save' : 'Add Paper'}
         </button>
         <button type="button" onClick={onCancel} style={btnSecondary}>
           Cancel

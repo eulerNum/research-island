@@ -10,9 +10,11 @@ import * as mapService from '../services/mapService';
 
 interface SidebarProps {
   data: ResearchMap;
+  highlightedPaperId?: string | null;
+  onHighlightPaper?: (paperId: string | null) => void;
 }
 
-export default function Sidebar({ data }: SidebarProps) {
+export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: SidebarProps) {
   const navigate = useNavigate();
   const ctx = useMapDataContext();
   const [showGitHubSettings, setShowGitHubSettings] = useState(false);
@@ -194,7 +196,20 @@ export default function Sidebar({ data }: SidebarProps) {
         <h3 style={sectionTitle}>Papers ({data.papers.length})</h3>
         <ul style={{ listStyle: 'none', padding: 0 }}>
           {data.papers.map((paper) => (
-            <li key={paper.id} style={{ padding: '3px 0', fontSize: '0.8rem', color: '#555' }}>
+            <li
+              key={paper.id}
+              onClick={() => onHighlightPaper?.(highlightedPaperId === paper.id ? null : paper.id)}
+              style={{
+                padding: '3px 6px',
+                fontSize: '0.8rem',
+                color: highlightedPaperId === paper.id ? '#023047' : '#555',
+                background: highlightedPaperId === paper.id ? '#fff8e1' : 'transparent',
+                borderRadius: 4,
+                cursor: onHighlightPaper ? 'pointer' : 'default',
+                fontWeight: highlightedPaperId === paper.id ? 600 : 400,
+                transition: 'all 0.15s',
+              }}
+            >
               {paper.title} ({paper.year})
             </li>
           ))}

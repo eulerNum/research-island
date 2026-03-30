@@ -195,6 +195,21 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .attr('stroke-dasharray', '12,12')
       .attr('pointer-events', 'none');
 
+    // Bridge labels
+    const bridgeLabels = bridgeGroups
+      .filter((d) => !!d.label)
+      .append('text')
+      .attr('class', 'bridge-label')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .attr('font-size', '11px')
+      .attr('fill', '#555')
+      .attr('pointer-events', 'none')
+      .text((d) => {
+        const label = d.label ?? '';
+        return label.length > 30 ? label.slice(0, 28) + '...' : label;
+      });
+
     // Island ellipses
     const islandGroups = g
       .selectAll<SVGGElement, SimNode>('.island-group')
@@ -267,11 +282,43 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
     }
 
+    // Compute label position at midpoint of bridge (accounting for curve)
+    function bridgeMidpoint(d: (typeof data.bridges)[0]): { x: number; y: number } {
+      const s = nodeMap.get(d.sourceIslandId);
+      const t = nodeMap.get(d.targetIslandId);
+      if (!s || !t) return { x: 0, y: 0 };
+      const x1 = s.x!, y1 = s.y!, x2 = t.x!, y2 = t.y!;
+      const key = pairKey(d.sourceIslandId, d.targetIslandId);
+      const total = pairCountMap.get(key) ?? 1;
+      const idx = bridgeOffsets.get(d.id) ?? 0;
+      if (total <= 1) {
+        return { x: (x1 + x2) / 2, y: (x1 + x2) === 0 ? (y1 + y2) / 2 : (y1 + y2) / 2 - 10 };
+      }
+      const SPREAD = 50;
+      const offset = (idx - (total - 1) / 2) * SPREAD;
+      const [sortedA, sortedB] = [d.sourceIslandId, d.targetIslandId].sort();
+      const sA = nodeMap.get(sortedA)!;
+      const sB = nodeMap.get(sortedB)!;
+      const pdx = sB.x! - sA.x!;
+      const pdy = sB.y! - sA.y!;
+      const len = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
+      const nx = -pdy / len;
+      const ny = pdx / len;
+      // Quadratic bezier midpoint at t=0.5: 0.25*P0 + 0.5*CP + 0.25*P1
+      const cpx = (x1 + x2) / 2 + nx * offset;
+      const cpy = (y1 + y2) / 2 + ny * offset;
+      return { x: 0.25 * x1 + 0.5 * cpx + 0.25 * x2, y: 0.25 * y1 + 0.5 * cpy + 0.25 * y2 };
+    }
+
     // Update positions function
     function updatePositions() {
       islandGroups.attr('transform', (d) => `translate(${d.x},${d.y})`);
       bridgeHitAreas.attr('d', bridgePath);
       bridgeLines.attr('d', bridgePath);
+      bridgeLabels.each(function (d) {
+        const mid = bridgeMidpoint(d);
+        d3.select(this).attr('x', mid.x).attr('y', mid.y - 10);
+      });
     }
 
     // Drag behavior (disabled in bridge-connect mode so clicks work)
