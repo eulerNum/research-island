@@ -14,8 +14,8 @@
       "id": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
       "name": "Flavors",
       "position": {
-        "x": 417,
-        "y": 607
+        "x": 404.5975341796875,
+        "y": 576.6016235351562
       },
       "cities": [],
       "color": "#a8dadc"
@@ -59,7 +59,8 @@
       "direction": "forward",
       "label": "Sensory",
       "paperIds": [],
-      "gapIds": []
+      "gapIds": [],
+      "color": "#ef4444"
     },
     {
       "id": "c6ef6665-51bb-4b66-a80e-d8865d0d5111",
@@ -68,7 +69,8 @@
       "direction": "forward",
       "label": "Sensory",
       "paperIds": [],
-      "gapIds": []
+      "gapIds": [],
+      "color": "#ef4444"
     },
     {
       "id": "5441b6c0-0dd7-44d2-813a-cb607c58af8e",
@@ -77,7 +79,8 @@
       "direction": "forward",
       "label": "Sensory",
       "paperIds": [],
-      "gapIds": []
+      "gapIds": [],
+      "color": "#ef4444"
     },
     {
       "id": "0f8d04bf-4cdf-4be4-abc9-ccd38be919ae",
@@ -88,8 +91,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 907.5,
-        "y": 207
+        "x": 905.5,
+        "y": 307
       }
     },
     {
@@ -115,10 +118,10 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 919.5,
-        "y": 615
+        "x": 893.5,
+        "y": 563
       },
-      "color": "#e76f51"
+      "color": "#a855f7"
     },
     {
       "id": "755cb2d0-678e-4158-a31c-92d87153ae85",
@@ -142,8 +145,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 632,
-        "y": 591.5
+        "x": 601.7012329101562,
+        "y": 562.1991882324219
       }
     },
     {
@@ -155,10 +158,10 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 700,
-        "y": 721.5
+        "x": 689.7012329101562,
+        "y": 640.1991882324219
       },
-      "color": "#e76f51"
+      "color": "#a855f7"
     },
     {
       "id": "f040bed5-4b27-4b3c-9a39-0d08e5b5af90",
@@ -172,7 +175,7 @@
         "x": 171.5,
         "y": 691
       },
-      "color": "#e76f51"
+      "color": "#a855f7"
     },
     {
       "id": "6e59e417-1aa8-454a-bc31-fb1f257d29e2",
@@ -182,7 +185,7 @@
       "label": "AI",
       "paperIds": [],
       "gapIds": [],
-      "color": "#e76f51",
+      "color": "#a855f7",
       "controlPoint": {
         "x": 409.5,
         "y": 560.5
@@ -200,7 +203,7 @@
         "x": 845.5,
         "y": 803.5
       },
-      "color": "#e76f51"
+      "color": "#a855f7"
     },
     {
       "id": "47da6d00-fbb9-4d1a-b484-bd979b99cde6",
@@ -214,7 +217,7 @@
         "x": 864,
         "y": 18
       },
-      "color": "#e76f51"
+      "color": "#a855f7"
     },
     {
       "id": "dd9c81ca-0721-45e5-967d-071e3fbeba77",
@@ -228,7 +231,7 @@
         "x": 798,
         "y": 96
       },
-      "color": "#f4a261"
+      "color": "#a855f7"
     },
     {
       "id": "1006c5b6-c4b6-4c3c-a2f8-671150bbb2e6",
@@ -242,7 +245,7 @@
         "x": 637,
         "y": 1086.5
       },
-      "color": "#e76f51"
+      "color": "#a855f7"
     }
   ],
   "roads": [],
