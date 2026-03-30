@@ -41,8 +41,7 @@ export default function OverviewPage() {
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
     defaultValue?: string;
-    showDirection?: boolean;
-    onConfirm: (value: string, direction?: 'forward' | 'backward') => void;
+    onConfirm: (value: string) => void;
   } | null>(null);
 
   const handleIslandClick = useCallback(
@@ -58,9 +57,8 @@ export default function OverviewPage() {
             setPromptDialog({
               title: '다리 이름 (Bridge label)',
               defaultValue: `${sourceName} → ${targetName}: `,
-              showDirection: true,
-              onConfirm: (label: string, direction?: 'forward' | 'backward') => {
-                ctx.addBridge(sourceId, islandId, direction ?? 'forward', label);
+              onConfirm: (label: string) => {
+                ctx.addBridge(sourceId, islandId, 'forward', label);
                 setPromptDialog(null);
               },
             });
@@ -263,7 +261,6 @@ export default function OverviewPage() {
         <PromptDialog
           title={promptDialog.title}
           defaultValue={promptDialog.defaultValue}
-          showDirection={promptDialog.showDirection}
           onConfirm={promptDialog.onConfirm}
           onCancel={() => setPromptDialog(null)}
         />

@@ -34,8 +34,7 @@ export default function IslandDetailPage() {
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
     defaultValue?: string;
-    showDirection?: boolean;
-    onConfirm: (value: string, direction?: 'forward' | 'backward') => void;
+    onConfirm: (value: string) => void;
   } | null>(null);
 
   const island = ctx.mapData.islands.find((i) => i.id === id);
@@ -61,9 +60,8 @@ export default function IslandDetailPage() {
             setPromptDialog({
               title: '도로 이름 (Road label)',
               defaultValue: `${sourceName} → ${targetName}: `,
-              showDirection: true,
-              onConfirm: (label: string, direction?: 'forward' | 'backward') => {
-                ctx.addRoad(sourceId, cityId, direction ?? 'forward', label);
+              onConfirm: (label: string) => {
+                ctx.addRoad(sourceId, cityId, 'forward', label);
                 setPromptDialog(null);
               },
             });
@@ -300,7 +298,6 @@ export default function IslandDetailPage() {
         <PromptDialog
           title={promptDialog.title}
           defaultValue={promptDialog.defaultValue}
-          showDirection={promptDialog.showDirection}
           onConfirm={promptDialog.onConfirm}
           onCancel={() => setPromptDialog(null)}
         />

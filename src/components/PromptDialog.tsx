@@ -3,19 +3,17 @@ import { useState } from 'react';
 interface PromptDialogProps {
   title: string;
   defaultValue?: string;
-  showDirection?: boolean;
-  onConfirm: (value: string, direction?: 'forward' | 'backward') => void;
+  onConfirm: (value: string) => void;
   onCancel: () => void;
 }
 
-export default function PromptDialog({ title, defaultValue, showDirection, onConfirm, onCancel }: PromptDialogProps) {
+export default function PromptDialog({ title, defaultValue, onConfirm, onCancel }: PromptDialogProps) {
   const [value, setValue] = useState(defaultValue ?? '');
-  const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (value.trim()) {
-      onConfirm(value.trim(), showDirection ? direction : undefined);
+      onConfirm(value.trim());
     }
   };
 
@@ -56,28 +54,6 @@ export default function PromptDialog({ title, defaultValue, showDirection, onCon
             fontSize: '0.9rem',
           }}
         />
-        {showDirection && (
-          <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="direction"
-                checked={direction === 'forward'}
-                onChange={() => setDirection('forward')}
-              />
-              <span style={{ color: '#2a9d8f', fontWeight: 600 }}>Forward →</span>
-            </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="direction"
-                checked={direction === 'backward'}
-                onChange={() => setDirection('backward')}
-              />
-              <span style={{ color: '#e76f51', fontWeight: 600 }}>← Backward</span>
-            </label>
-          </div>
-        )}
         <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
           <button
             type="button"
