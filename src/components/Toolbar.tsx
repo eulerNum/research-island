@@ -1,6 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as d3 from 'd3';
 import type { ToolbarMode } from '../hooks/useToolbar';
 import { exportSvg, exportPng } from '../utils/exportMap';
+import { useThemeContext } from '../contexts/ThemeContext';
 
 const MODE_LABELS: Record<ToolbarMode, string> = {
   select: 'Select',
@@ -34,12 +36,31 @@ export default function Toolbar({
   svgRef,
 }: ToolbarProps) {
   const [showExport, setShowExport] = useState(false);
+  const { theme, toggle } = useThemeContext();
   const isBridgeOrRoad = mode === 'bridge-connect' || mode === 'road-connect';
   const statusText = isBridgeOrRoad
     ? connectionStart
       ? 'End point click...'
       : 'Start point click...'
     : null;
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Skip if user is typing in an input/textarea
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      if (e.key === 'Escape') {
+        onModeChange('select');
+      } else if (e.key >= '1' && e.key <= String(availableModes.length)) {
+        const idx = parseInt(e.key) - 1;
+        if (availableModes[idx]) onModeChange(availableModes[idx]);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onModeChange, availableModes]);
 
   return (
     <div
@@ -49,21 +70,22 @@ export default function Toolbar({
         alignItems: 'center',
         gap: 8,
         padding: '0 16px',
-        background: '#f8f9fa',
-        borderBottom: '1px solid #dee2e6',
+        background: 'var(--bg-secondary)',
+        borderBottom: '1px solid var(--border-primary)',
         flexShrink: 0,
       }}
     >
-      {availableModes.map((m) => (
+      {availableModes.map((m, i) => (
         <button
           key={m}
           onClick={() => onModeChange(m)}
+          title={`${MODE_LABELS[m]} (${i + 1})`}
           style={{
             padding: '6px 14px',
-            border: mode === m ? '2px solid #023047' : '1px solid #adb5bd',
+            border: mode === m ? '2px solid var(--btn-active-bg)' : '1px solid var(--btn-secondary-border)',
             borderRadius: 6,
-            background: mode === m ? '#023047' : '#fff',
-            color: mode === m ? '#fff' : '#333',
+            background: mode === m ? 'var(--btn-active-bg)' : 'var(--btn-secondary-bg)',
+            color: mode === m ? 'var(--btn-active-text)' : 'var(--text-primary)',
             cursor: 'pointer',
             fontSize: '0.85rem',
             fontWeight: mode === m ? 'bold' : 'normal',
@@ -74,6 +96,7 @@ export default function Toolbar({
         >
           <span>{MODE_ICONS[m]}</span>
           {MODE_LABELS[m]}
+          <span style={{ fontSize: '0.65rem', opacity: 0.5 }}>{i + 1}</span>
         </button>
       ))}
       {statusText && (
@@ -81,23 +104,84 @@ export default function Toolbar({
           style={{
             marginLeft: 16,
             fontSize: '0.85rem',
-            color: '#e76f51',
+            color: 'var(--accent-backward)',
             fontWeight: 'bold',
           }}
         >
           {statusText}
         </span>
       )}
-      {/* Export dropdown */}
+      {/* Theme toggle + Fit to view + Export */}
       {svgRef && (
-        <div style={{ marginLeft: 'auto', position: 'relative' }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={toggle}
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--btn-secondary-border)',
+              borderRadius: 6,
+              background: 'var(--btn-secondary-bg)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+            }}
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
+          <button
+            onClick={() => {
+              if (!svgRef.current) return;
+              const svg = svgRef.current;
+              const sel = d3.select(svg);
+              const gEl = svg.querySelector('g');
+              if (!gEl) return;
+              const bbox = gEl.getBBox();
+              const svgW = svg.clientWidth || 800;
+              const svgH = svg.clientHeight || 600;
+              const padding = 40;
+              const scale = Math.min(
+                (svgW - padding * 2) / (bbox.width || 1),
+                (svgH - padding * 2) / (bbox.height || 1),
+                2,
+              );
+              const tx = svgW / 2 - (bbox.x + bbox.width / 2) * scale;
+              const ty = svgH / 2 - (bbox.y + bbox.height / 2) * scale;
+              const transform = d3.zoomIdentity.translate(tx, ty).scale(scale);
+
+              const realZoom = d3.zoom<SVGSVGElement, unknown>()
+                .scaleExtent([0.3, 5])
+                .on('zoom', (event: d3.D3ZoomEvent<SVGSVGElement, unknown>) => {
+                  d3.select(svg).select('g').attr('transform', event.transform.toString());
+                });
+              sel.call(realZoom);
+              sel.transition().duration(500).call(realZoom.transform, transform);
+            }}
+            title="Fit to View (전체 보기)"
+            style={{
+              padding: '6px 12px',
+              border: '1px solid var(--btn-secondary-border)',
+              borderRadius: 6,
+              background: 'var(--btn-secondary-bg)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: '0.85rem',
+            }}
+          >
+            Fit
+          </button>
+        </div>
+      )}
+      {svgRef && (
+        <div style={{ position: 'relative' }}>
           <button
             onClick={() => setShowExport(!showExport)}
             style={{
               padding: '6px 14px',
-              border: '1px solid #adb5bd',
+              border: '1px solid var(--btn-secondary-border)',
               borderRadius: 6,
-              background: '#fff',
+              background: 'var(--btn-secondary-bg)',
+              color: 'var(--text-primary)',
               cursor: 'pointer',
               fontSize: '0.85rem',
             }}
@@ -111,10 +195,10 @@ export default function Toolbar({
                 top: '100%',
                 right: 0,
                 marginTop: 4,
-                background: '#fff',
-                border: '1px solid #ddd',
+                background: 'var(--bg-dropdown)',
+                border: '1px solid var(--border-secondary)',
                 borderRadius: 6,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                boxShadow: 'var(--shadow-dropdown)',
                 zIndex: 100,
                 overflow: 'hidden',
               }}
@@ -145,12 +229,13 @@ export default function Toolbar({
       {mode !== 'select' && (
         <button
           onClick={() => onModeChange('select')}
+          title="Select mode (ESC)"
           style={{
-            marginLeft: svgRef ? 0 : 'auto',
             padding: '4px 10px',
-            border: '1px solid #adb5bd',
+            border: '1px solid var(--btn-secondary-border)',
             borderRadius: 4,
-            background: '#fff',
+            background: 'var(--btn-secondary-bg)',
+            color: 'var(--text-primary)',
             cursor: 'pointer',
             fontSize: '0.8rem',
           }}
@@ -167,7 +252,8 @@ const exportItemStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 20px',
   border: 'none',
-  background: '#fff',
+  background: 'var(--bg-dropdown)',
+  color: 'var(--text-primary)',
   cursor: 'pointer',
   fontSize: '0.85rem',
   textAlign: 'left',

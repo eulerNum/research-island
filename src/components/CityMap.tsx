@@ -2,6 +2,7 @@ import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import * as d3 from 'd3';
 import type { Island, Road } from '../services/types';
 import type { ToolbarMode } from '../hooks/useToolbar';
+import * as mapService from '../services/mapService';
 
 export interface CityMapContextMenuEvent {
   type: 'city' | 'road';
@@ -152,20 +153,22 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       roadOffsets.set(r.id, idx);
     }
 
-    function roadPath(d: Road): string {
+    function roadControlPoint(d: Road): { x: number; y: number } {
       const s = cityMap.get(d.sourceCityId);
       const t = cityMap.get(d.targetCityId);
-      if (!s || !t) return '';
+      if (!s || !t) return { x: 0, y: 0 };
       const x1 = s.x, y1 = s.y, x2 = t.x, y2 = t.y;
+
+      if (d.controlPoint) return d.controlPoint;
+
       const key = pairKey(d.sourceCityId, d.targetCityId);
       const total = pairCountMap.get(key) ?? 1;
       const idx = roadOffsets.get(d.id) ?? 0;
       if (total <= 1) {
-        return `M${x1},${y1} L${x2},${y2}`;
+        return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
       }
       const SPREAD = 35;
       const offset = (idx - (total - 1) / 2) * SPREAD;
-      // Perpendicular from sorted-pair direction so opposite roads curve differently
       const [sortedA, sortedB] = [d.sourceCityId, d.targetCityId].sort();
       const sA = cityMap.get(sortedA)!;
       const sB = cityMap.get(sortedB)!;
@@ -174,9 +177,20 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       const len = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
       const nx = -pdy / len;
       const ny = pdx / len;
-      const mx = (x1 + x2) / 2 + nx * offset;
-      const my = (y1 + y2) / 2 + ny * offset;
-      return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
+      return { x: (x1 + x2) / 2 + nx * offset, y: (y1 + y2) / 2 + ny * offset };
+    }
+
+    function roadPath(d: Road): string {
+      const s = cityMap.get(d.sourceCityId);
+      const t = cityMap.get(d.targetCityId);
+      if (!s || !t) return '';
+      const x1 = s.x, y1 = s.y, x2 = t.x, y2 = t.y;
+      const cp = roadControlPoint(d);
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      if (!d.controlPoint && Math.abs(cp.x - mx) < 1 && Math.abs(cp.y - my) < 1) {
+        return `M${x1},${y1} L${x2},${y2}`;
+      }
+      return `M${x1},${y1} Q${cp.x},${cp.y} ${x2},${y2}`;
     }
 
     // Road groups: invisible hit area + visible path
@@ -215,31 +229,16 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .attr('pointer-events', 'none')
       .attr('d', roadPath);
 
-    // Road labels at midpoint
+    // Visual midpoint of road curve
     function roadMidpoint(d: Road): { x: number; y: number } {
       const s = cityMap.get(d.sourceCityId);
       const t = cityMap.get(d.targetCityId);
       if (!s || !t) return { x: 0, y: 0 };
-      const x1 = s.x, y1 = s.y, x2 = t.x, y2 = t.y;
-      const key = pairKey(d.sourceCityId, d.targetCityId);
-      const total = pairCountMap.get(key) ?? 1;
-      const idx = roadOffsets.get(d.id) ?? 0;
-      if (total <= 1) {
-        return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 - 8 };
-      }
-      const SPREAD = 35;
-      const offset = (idx - (total - 1) / 2) * SPREAD;
-      const [sortedA, sortedB] = [d.sourceCityId, d.targetCityId].sort();
-      const sA = cityMap.get(sortedA)!;
-      const sB = cityMap.get(sortedB)!;
-      const pdx = sB.x - sA.x;
-      const pdy = sB.y - sA.y;
-      const len = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
-      const nx = -pdy / len;
-      const ny = pdx / len;
-      const cpx = (x1 + x2) / 2 + nx * offset;
-      const cpy = (y1 + y2) / 2 + ny * offset;
-      return { x: 0.25 * x1 + 0.5 * cpx + 0.25 * x2, y: 0.25 * y1 + 0.5 * cpy + 0.25 * y2 - 8 };
+      const cp = roadControlPoint(d);
+      return {
+        x: 0.25 * s.x + 0.5 * cp.x + 0.25 * t.x,
+        y: 0.25 * s.y + 0.5 * cp.y + 0.25 * t.y,
+      };
     }
 
     roadGroups
@@ -259,6 +258,95 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
         const label = d.label ?? '';
         return label.length > 25 ? label.slice(0, 23) + '...' : label;
       });
+
+    // Road paper count badge
+    const roadBadges = roadGroups
+      .filter((d) => d.paperIds.length > 0)
+      .append('g')
+      .attr('class', 'road-badge')
+      .attr('pointer-events', 'none')
+      .each(function (d) {
+        const mid = roadMidpoint(d);
+        d3.select(this).attr('transform', `translate(${mid.x},${mid.y + 12})`);
+      });
+    roadBadges
+      .append('circle')
+      .attr('r', 8)
+      .attr('fill', '#023047')
+      .attr('opacity', 0.75);
+    roadBadges
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', '8px')
+      .attr('fill', '#fff')
+      .attr('font-weight', 'bold')
+      .text((d) => d.paperIds.length);
+
+    // Curve drag handles for roads
+    const roadCurveHandles = g
+      .selectAll<SVGCircleElement, Road>('.road-curve-handle')
+      .data(roads)
+      .enter()
+      .append('circle')
+      .attr('class', 'road-curve-handle')
+      .attr('r', 5)
+      .attr('fill', 'var(--accent-forward)')
+      .attr('fill-opacity', 0)
+      .attr('stroke', 'var(--accent-forward)')
+      .attr('stroke-opacity', 0)
+      .attr('stroke-width', 1.5)
+      .attr('cursor', 'grab')
+      .each(function (d) {
+        const mid = roadMidpoint(d);
+        d3.select(this).attr('cx', mid.x).attr('cy', mid.y);
+      });
+
+    roadCurveHandles
+      .on('mouseenter', function () {
+        if (modeRef.current !== 'select') return;
+        d3.select(this).attr('fill-opacity', 0.3).attr('stroke-opacity', 0.8);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('fill-opacity', 0).attr('stroke-opacity', 0);
+      });
+
+    const roadCurveDrag = d3
+      .drag<SVGCircleElement, Road>()
+      .filter(() => modeRef.current === 'select')
+      .on('start', function () {
+        d3.select(this).attr('fill-opacity', 0.5).attr('stroke-opacity', 1).attr('cursor', 'grabbing');
+      })
+      .on('drag', function (event, d) {
+        const s = cityMap.get(d.sourceCityId);
+        const t = cityMap.get(d.targetCityId);
+        if (!s || !t) return;
+        const cpx = 2 * event.x - 0.5 * (s.x + t.x);
+        const cpy = 2 * event.y - 0.5 * (s.y + t.y);
+        d.controlPoint = { x: cpx, y: cpy };
+        // Update road paths and labels
+        g.selectAll<SVGPathElement, Road>('.road-hit').attr('d', roadPath);
+        g.selectAll<SVGPathElement, Road>('.road').attr('d', roadPath);
+        g.selectAll<SVGTextElement, Road>('.road-label').each(function (rd) {
+          const mid = roadMidpoint(rd);
+          d3.select(this).attr('x', mid.x).attr('y', mid.y);
+        });
+        g.selectAll<SVGGElement, Road>('.road-badge').each(function (rd) {
+          const mid = roadMidpoint(rd);
+          d3.select(this).attr('transform', `translate(${mid.x},${mid.y + 12})`);
+        });
+        roadCurveHandles.each(function (rd) {
+          const mid = roadMidpoint(rd);
+          d3.select(this).attr('cx', mid.x).attr('cy', mid.y);
+        });
+      })
+      .on('end', function (_event, d) {
+        d3.select(this).attr('fill-opacity', 0).attr('stroke-opacity', 0).attr('cursor', 'grab');
+        if (d.controlPoint) {
+          mapService.updateRoadControlPoint(d.id, d.controlPoint);
+        }
+      });
+    roadCurveHandles.call(roadCurveDrag);
 
     // City nodes
     const cityGroups = g
@@ -317,12 +405,16 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
           'transform',
           `translate(${d.x},${d.y})`,
         );
-        // Update connected roads and labels
+        // Update connected roads, labels, and badges
         g.selectAll<SVGPathElement, Road>('.road-hit').attr('d', roadPath);
         g.selectAll<SVGPathElement, Road>('.road').attr('d', roadPath);
         g.selectAll<SVGTextElement, Road>('.road-label').each(function (rd) {
           const mid = roadMidpoint(rd);
           d3.select(this).attr('x', mid.x).attr('y', mid.y);
+        });
+        g.selectAll<SVGGElement, Road>('.road-badge').each(function (rd) {
+          const mid = roadMidpoint(rd);
+          d3.select(this).attr('transform', `translate(${mid.x},${mid.y + 12})`);
         });
       })
       .on('end', (_event, d) => {
@@ -363,7 +455,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       style={{
         width: '100%',
         height: '100%',
-        background: 'linear-gradient(180deg, #f0f8f0 0%, #f0f4f8 100%)',
+        background: 'var(--bg-map)',
       }}
     />
   );

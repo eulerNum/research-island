@@ -22,7 +22,7 @@ export default function PromptDialog({ title, defaultValue, onConfirm, onCancel 
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.3)',
+        background: 'var(--bg-modal-overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -34,10 +34,11 @@ export default function PromptDialog({ title, defaultValue, onConfirm, onCancel 
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#fff',
+          background: 'var(--bg-primary)',
           padding: '20px 24px',
           borderRadius: 10,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          boxShadow: 'var(--shadow-dropdown)',
+          color: 'var(--text-primary)',
           minWidth: 300,
         }}
       >
@@ -49,9 +50,11 @@ export default function PromptDialog({ title, defaultValue, onConfirm, onCancel 
           style={{
             width: '100%',
             padding: '8px 10px',
-            border: '1px solid #ccc',
+            border: '1px solid var(--border-input)',
             borderRadius: 6,
             fontSize: '0.9rem',
+            background: 'var(--bg-input)',
+            color: 'var(--text-primary)',
           }}
         />
         <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'flex-end' }}>
@@ -60,10 +63,11 @@ export default function PromptDialog({ title, defaultValue, onConfirm, onCancel 
             onClick={onCancel}
             style={{
               padding: '6px 16px',
-              border: '1px solid #ccc',
+              border: '1px solid var(--btn-secondary-border)',
               borderRadius: 6,
-              background: '#fff',
+              background: 'var(--bg-primary)',
               cursor: 'pointer',
+              color: 'var(--text-primary)',
             }}
           >
             Cancel
@@ -74,7 +78,7 @@ export default function PromptDialog({ title, defaultValue, onConfirm, onCancel 
               padding: '6px 16px',
               border: 'none',
               borderRadius: 6,
-              background: '#023047',
+              background: 'var(--text-heading)',
               color: '#fff',
               cursor: 'pointer',
             }}

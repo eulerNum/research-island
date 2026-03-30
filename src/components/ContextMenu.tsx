@@ -51,10 +51,10 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
         position: 'fixed',
         left: x,
         top: y,
-        background: '#fff',
-        border: '1px solid #ddd',
+        background: 'var(--bg-primary)',
+        border: '1px solid var(--border-secondary)',
         borderRadius: 8,
-        boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+        boxShadow: 'var(--shadow-dropdown)',
         zIndex: 2000,
         minWidth: 160,
         padding: '4px 0',
@@ -64,7 +64,7 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
         if (item.type === 'palette') {
           return (
             <div key={i} style={{ padding: '6px 12px' }}>
-              <div style={{ fontSize: '0.75rem', color: '#888', marginBottom: 4 }}>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: 4 }}>
                 {item.label}
               </div>
               <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -79,11 +79,11 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
                       width: 22,
                       height: 22,
                       borderRadius: '50%',
-                      border: item.currentColor === c ? '2px solid #023047' : '2px solid transparent',
+                      border: item.currentColor === c ? '2px solid var(--text-heading)' : '2px solid transparent',
                       background: c,
                       cursor: 'pointer',
                       padding: 0,
-                      outline: item.currentColor === c ? '1px solid #fff' : 'none',
+                      outline: item.currentColor === c ? '1px solid var(--bg-primary)' : 'none',
                       outlineOffset: -3,
                     }}
                     title={c}
@@ -111,10 +111,10 @@ export default function ContextMenu({ x, y, items, onClose }: ContextMenuProps) 
               textAlign: 'left',
               cursor: 'pointer',
               fontSize: '0.85rem',
-              color: btn.color ?? '#333',
+              color: btn.color ?? 'var(--text-primary)',
             }}
             onMouseEnter={(e) => {
-              (e.target as HTMLElement).style.background = '#f0f0f0';
+              (e.target as HTMLElement).style.background = 'var(--bg-secondary)';
             }}
             onMouseLeave={(e) => {
               (e.target as HTMLElement).style.background = 'transparent';

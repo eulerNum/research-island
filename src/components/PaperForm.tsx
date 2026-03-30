@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import type { Paper } from '../services/types';
 import { generateId } from '../utils/idGenerator';
+import { searchPapers } from '../services/semanticScholarService';
 
 interface PaperFormProps {
   initialPaper?: Paper;
@@ -29,6 +30,9 @@ export default function PaperForm({ initialPaper, onSubmit, onCancel }: PaperFor
   const [url, setUrl] = useState(initialPaper?.url ?? '');
   const [figures, setFigures] = useState<string[]>(initialPaper?.figureUrls ?? []);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [s2Results, setS2Results] = useState<Paper[]>([]);
+  const [s2Loading, setS2Loading] = useState(false);
+  const [s2Error, setS2Error] = useState<string | null>(null);
 
   const addImages = useCallback(async (files: File[] | Blob[]) => {
     const dataUrls: string[] = [];
@@ -103,13 +107,88 @@ export default function PaperForm({ initialPaper, onSubmit, onCancel }: PaperFor
     >
       <div>
         <label style={labelStyle}>Title *</label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={inputStyle}
-          required
-          autoFocus
-        />
+        <div style={{ display: 'flex', gap: 4 }}>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            style={{ ...inputStyle, flex: 1 }}
+            required
+            autoFocus
+          />
+          {!isEdit && (
+            <button
+              type="button"
+              disabled={!title.trim() || s2Loading}
+              onClick={async () => {
+                setS2Loading(true);
+                setS2Error(null);
+                try {
+                  const results = await searchPapers(title.trim(), 5);
+                  setS2Results(results);
+                } catch (e) {
+                  setS2Error((e as Error).message);
+                } finally {
+                  setS2Loading(false);
+                }
+              }}
+              style={{
+                padding: '4px 8px',
+                border: '1px solid var(--accent-forward)',
+                borderRadius: 4,
+                background: 'var(--bg-secondary)',
+                cursor: title.trim() && !s2Loading ? 'pointer' : 'default',
+                fontSize: '0.7rem',
+                color: 'var(--accent-forward)',
+                whiteSpace: 'nowrap',
+                opacity: title.trim() && !s2Loading ? 1 : 0.5,
+              }}
+              title="Semantic Scholar에서 검색"
+            >
+              {s2Loading ? '...' : 'S2 검색'}
+            </button>
+          )}
+        </div>
+        {s2Error && (
+          <div style={{ fontSize: '0.7rem', color: '#dc2626', marginTop: 2 }}>{s2Error}</div>
+        )}
+        {s2Results.length > 0 && (
+          <div style={{
+            marginTop: 4,
+            maxHeight: 160,
+            overflowY: 'auto',
+            border: '1px solid var(--border-secondary)',
+            borderRadius: 4,
+            background: 'var(--bg-secondary)',
+          }}>
+            {s2Results.map((p) => (
+              <div
+                key={p.id}
+                onClick={() => {
+                  setTitle(p.title);
+                  setAuthors(p.authors.join(', '));
+                  setYear(p.year);
+                  if (p.abstract) setAbstract(p.abstract);
+                  if (p.url) setUrl(p.url);
+                  setS2Results([]);
+                }}
+                style={{
+                  padding: '4px 8px',
+                  fontSize: '0.75rem',
+                  cursor: 'pointer',
+                  borderBottom: '1px solid var(--border-secondary)',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <div style={{ fontWeight: 500 }}>{p.title}</div>
+                <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                  {p.authors.slice(0, 3).join(', ')}{p.authors.length > 3 ? ' ...' : ''} ({p.year})
+                  {p.citationCount != null && <span> · {p.citationCount} citations</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div>
         <label style={labelStyle}>Authors (comma separated)</label>
@@ -174,7 +253,7 @@ export default function PaperForm({ initialPaper, onSubmit, onCancel }: PaperFor
                     height: 52,
                     objectFit: 'cover',
                     borderRadius: 4,
-                    border: '1px solid #ccc',
+                    border: '1px solid var(--border-input)',
                   }}
                 />
                 <button
@@ -222,21 +301,23 @@ export default function PaperForm({ initialPaper, onSubmit, onCancel }: PaperFor
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '0.75rem',
-  color: '#666',
+  color: 'var(--text-secondary)',
   marginBottom: 2,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '6px 8px',
-  border: '1px solid #ccc',
+  border: '1px solid var(--border-input)',
   borderRadius: 4,
   fontSize: '0.85rem',
+  background: 'var(--bg-input)',
+  color: 'var(--text-primary)',
 };
 
 const btnPrimary: React.CSSProperties = {
   padding: '6px 14px',
-  background: '#2a9d8f',
+  background: 'var(--accent-forward)',
   color: '#fff',
   border: 'none',
   borderRadius: 4,
@@ -246,9 +327,10 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   padding: '6px 14px',
-  background: '#eee',
+  background: 'var(--btn-secondary-bg)',
   border: 'none',
   borderRadius: 4,
   cursor: 'pointer',
   fontSize: '0.8rem',
+  color: 'var(--text-primary)',
 };

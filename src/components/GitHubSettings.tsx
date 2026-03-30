@@ -22,7 +22,7 @@ export default function GitHubSettings({ onClose }: GitHubSettingsProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.3)',
+        background: 'var(--bg-modal-overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -33,10 +33,11 @@ export default function GitHubSettings({ onClose }: GitHubSettingsProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#fff',
+          background: 'var(--bg-primary)',
           padding: '24px',
           borderRadius: 10,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          boxShadow: 'var(--shadow-dropdown)',
+          color: 'var(--text-primary)',
           minWidth: 340,
         }}
       >
@@ -87,21 +88,23 @@ export default function GitHubSettings({ onClose }: GitHubSettingsProps) {
 const labelStyle: React.CSSProperties = {
   display: 'block',
   fontSize: '0.75rem',
-  color: '#666',
+  color: 'var(--text-secondary)',
   marginBottom: 2,
 };
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
-  border: '1px solid #ccc',
+  border: '1px solid var(--border-input)',
   borderRadius: 6,
   fontSize: '0.85rem',
+  background: 'var(--bg-input)',
+  color: 'var(--text-primary)',
 };
 
 const btnPrimary: React.CSSProperties = {
   padding: '8px 18px',
-  background: '#023047',
+  background: 'var(--text-heading)',
   color: '#fff',
   border: 'none',
   borderRadius: 6,
@@ -111,9 +114,10 @@ const btnPrimary: React.CSSProperties = {
 
 const btnSecondary: React.CSSProperties = {
   padding: '8px 18px',
-  background: '#fff',
-  border: '1px solid #ccc',
+  background: 'var(--bg-primary)',
+  border: '1px solid var(--btn-secondary-border)',
   borderRadius: 6,
   cursor: 'pointer',
   fontSize: '0.85rem',
+  color: 'var(--text-primary)',
 };

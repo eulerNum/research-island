@@ -20,7 +20,7 @@ export default function SheetsSettings({ onClose }: SheetsSettingsProps) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(0,0,0,0.3)',
+        background: 'var(--bg-modal-overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -31,16 +31,17 @@ export default function SheetsSettings({ onClose }: SheetsSettingsProps) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#fff',
+          background: 'var(--bg-primary)',
           padding: '20px 24px',
           borderRadius: 10,
-          boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+          boxShadow: 'var(--shadow-dropdown)',
+          color: 'var(--text-primary)',
           minWidth: 360,
         }}
       >
         <h3 style={{ margin: '0 0 12px', fontSize: '1rem' }}>Google Sheets (n8n)</h3>
         <div style={{ marginBottom: 10 }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', color: '#666', marginBottom: 2 }}>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>
             Push Webhook URL
           </label>
           <input
@@ -51,7 +52,7 @@ export default function SheetsSettings({ onClose }: SheetsSettingsProps) {
           />
         </div>
         <div style={{ marginBottom: 14 }}>
-          <label style={{ display: 'block', fontSize: '0.75rem', color: '#666', marginBottom: 2 }}>
+          <label style={{ display: 'block', fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: 2 }}>
             Pull Webhook URL
           </label>
           <input
@@ -73,24 +74,27 @@ export default function SheetsSettings({ onClose }: SheetsSettingsProps) {
 const inputStyle: React.CSSProperties = {
   width: '100%',
   padding: '8px 10px',
-  border: '1px solid #ccc',
+  border: '1px solid var(--border-input)',
   borderRadius: 6,
   fontSize: '0.85rem',
+  background: 'var(--bg-input)',
+  color: 'var(--text-primary)',
 };
 
 const btnPrimary: React.CSSProperties = {
   padding: '6px 16px',
   border: 'none',
   borderRadius: 6,
-  background: '#023047',
+  background: 'var(--text-heading)',
   color: '#fff',
   cursor: 'pointer',
 };
 
 const btnSecondary: React.CSSProperties = {
   padding: '6px 16px',
-  border: '1px solid #ccc',
+  border: '1px solid var(--btn-secondary-border)',
   borderRadius: 6,
-  background: '#fff',
+  background: 'var(--bg-primary)',
   cursor: 'pointer',
+  color: 'var(--text-primary)',
 };

@@ -1,8 +1,14 @@
 import { useState, useMemo } from 'react';
 import type { Bridge, Road, Paper, ResearchGap } from '../services/types';
+import { getClaudeConfig, suggestPapers } from '../services/aiService';
+import type { AISuggestion } from '../services/aiService';
+import { getGitHubConfig } from '../services/githubService';
+import { uploadFigure } from '../services/figureService';
+import { generateId } from '../utils/idGenerator';
 import GapMemo from './GapMemo';
 import PaperForm from './PaperForm';
 import FigureLightbox from './FigureLightbox';
+import ClaudeSettings from './ClaudeSettings';
 
 interface CrossRef {
   type: 'bridge' | 'road';
@@ -20,7 +26,11 @@ interface DetailPanelProps {
   allBridges: Bridge[];
   allRoads: Road[];
   allIslandCityMap?: Map<string, string>; // cityId → islandId lookup
+  islandNameMap?: Map<string, string>; // islandId → name lookup
+  cityNameMap?: Map<string, string>; // cityId → name lookup
   highlightedPaperId?: string | null;
+  sourceLabel?: string; // source island/city name for AI prompt
+  targetLabel?: string; // target island/city name for AI prompt
   onAddPaper: (paper: Paper) => void;
   onUpdatePaper?: (paper: Paper) => void;
   onAddGap: (gap: ResearchGap) => void;
@@ -42,6 +52,10 @@ export default function DetailPanel({
   allRoads,
   allIslandCityMap,
   highlightedPaperId,
+  islandNameMap,
+  cityNameMap,
+  sourceLabel,
+  targetLabel,
   onAddPaper,
   onUpdatePaper,
   onAddGap,
@@ -57,6 +71,10 @@ export default function DetailPanel({
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
   const [pinnedPaperId, setPinnedPaperId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [showClaudeSettings, setShowClaudeSettings] = useState(false);
 
   const entity = bridge ?? road;
   const paperIds = entity?.paperIds ?? [];
@@ -68,32 +86,51 @@ export default function DetailPanel({
       const refs: CrossRef[] = [];
       for (const b of allBridges) {
         if (b.id !== bridge?.id && b.paperIds.includes(paper.id)) {
-          refs.push({ type: 'bridge', id: b.id, label: b.label || b.id.slice(0, 8), direction: b.direction });
+          const src = islandNameMap?.get(b.sourceIslandId) ?? '?';
+          const tgt = islandNameMap?.get(b.targetIslandId) ?? '?';
+          const contextLabel = b.label ? `${src}→${tgt}: ${b.label}` : `${src}→${tgt}`;
+          refs.push({ type: 'bridge', id: b.id, label: contextLabel, direction: b.direction });
         }
       }
       for (const r of allRoads) {
         if (r.id !== road?.id && r.paperIds.includes(paper.id)) {
           const islandId = allIslandCityMap?.get(r.sourceCityId) ?? allIslandCityMap?.get(r.targetCityId);
-          refs.push({ type: 'road', id: r.id, label: r.label || r.id.slice(0, 8), direction: r.direction, islandId });
+          const src = cityNameMap?.get(r.sourceCityId) ?? '?';
+          const tgt = cityNameMap?.get(r.targetCityId) ?? '?';
+          const contextLabel = r.label ? `${src}→${tgt}: ${r.label}` : `${src}→${tgt}`;
+          refs.push({ type: 'road', id: r.id, label: contextLabel, direction: r.direction, islandId });
         }
       }
       if (refs.length > 0) map.set(paper.id, refs);
     }
     return map;
-  }, [linkedPapers, allBridges, allRoads, allIslandCityMap, bridge, road]);
+  }, [linkedPapers, allBridges, allRoads, allIslandCityMap, islandNameMap, cityNameMap, bridge, road]);
 
   if (!entity) return null;
 
-  const entityType = bridge ? 'Bridge' : 'Road';
   const gapIds = entity.gapIds;
-  const dirColor = entity.color ?? (entity.direction === 'forward' ? '#2a9d8f' : '#e76f51');
+  const dirColor = entity.color ?? (entity.direction === 'forward' ? 'var(--accent-forward)' : 'var(--accent-backward)');
+
+  // Build full display name: "Source→Target: label"
+  let entityDisplayName: string;
+  if (bridge) {
+    const src = islandNameMap?.get(bridge.sourceIslandId) ?? '?';
+    const tgt = islandNameMap?.get(bridge.targetIslandId) ?? '?';
+    entityDisplayName = bridge.label ? `${src}→${tgt}: ${bridge.label}` : `${src}→${tgt}`;
+  } else if (road) {
+    const src = cityNameMap?.get(road.sourceCityId) ?? '?';
+    const tgt = cityNameMap?.get(road.targetCityId) ?? '?';
+    entityDisplayName = road.label ? `${src}→${tgt}: ${road.label}` : `${src}→${tgt}`;
+  } else {
+    entityDisplayName = entity.label || 'Untitled';
+  }
 
   return (
     <aside
       style={{
         width: 360,
-        borderLeft: '1px solid #ddd',
-        background: '#fff',
+        borderLeft: '1px solid var(--border-secondary)',
+        background: 'var(--bg-primary)',
         overflowY: 'auto',
         padding: '16px',
         display: 'flex',
@@ -106,7 +143,7 @@ export default function DetailPanel({
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ fontSize: '1rem', margin: 0 }}>
           <span style={{ color: dirColor }}>{entity.direction === 'forward' ? '\u2192' : '\u2190'}</span>{' '}
-          {entityType}: {entity.label || 'Untitled'}
+          {entityDisplayName}
         </h3>
         <button
           onClick={onClose}
@@ -115,7 +152,7 @@ export default function DetailPanel({
             border: 'none',
             fontSize: '1.2rem',
             cursor: 'pointer',
-            color: '#999',
+            color: 'var(--text-muted)',
           }}
         >
           &times;
@@ -127,7 +164,7 @@ export default function DetailPanel({
 
       {/* Papers */}
       <div>
-        <h4 style={{ fontSize: '0.85rem', color: '#555', marginBottom: 8 }}>
+        <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
           Papers ({linkedPapers.length})
         </h4>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -140,10 +177,10 @@ export default function DetailPanel({
                 key={paper.id}
                 style={{
                   padding: '8px 10px',
-                  background: isHighlighted ? '#fff8e1' : '#f8f9fa',
+                  background: isHighlighted ? 'var(--bg-highlight)' : 'var(--bg-paper)',
                   borderRadius: 6,
-                  border: `1px solid ${isHighlighted ? '#ffd700' : '#e9ecef'}`,
-                  borderLeft: isHighlighted ? '3px solid #ffd700' : '1px solid #e9ecef',
+                  border: `1px solid ${isHighlighted ? 'var(--accent-highlight)' : 'var(--border-paper)'}`,
+                  borderLeft: isHighlighted ? '3px solid var(--accent-highlight)' : `1px solid var(--border-paper)`,
                   fontSize: '0.85rem',
                   transition: 'all 0.15s ease',
                 }}
@@ -153,7 +190,7 @@ export default function DetailPanel({
                 <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ flex: 1 }}>
                     {paper.title}{' '}
-                    <span style={{ fontWeight: 'normal', color: '#888' }}>({paper.year})</span>
+                    <span style={{ fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({paper.year})</span>
                   </span>
                   <div style={{ display: 'flex', gap: 2, flexShrink: 0 }}>
                     <button
@@ -173,7 +210,7 @@ export default function DetailPanel({
                         border: 'none',
                         cursor: 'pointer',
                         fontSize: '0.9rem',
-                        color: isPinned ? '#ffd700' : '#ccc',
+                        color: isPinned ? 'var(--accent-highlight)' : 'var(--text-muted)',
                         padding: '0 2px',
                       }}
                     >
@@ -192,7 +229,7 @@ export default function DetailPanel({
                           border: 'none',
                           cursor: 'pointer',
                           fontSize: '0.8rem',
-                          color: '#888',
+                          color: 'var(--text-tertiary)',
                           padding: '0 2px',
                         }}
                       >
@@ -211,7 +248,7 @@ export default function DetailPanel({
                           border: 'none',
                           cursor: 'pointer',
                           fontSize: '0.8rem',
-                          color: '#aaa',
+                          color: 'var(--text-muted)',
                           padding: '0 2px',
                         }}
                       >
@@ -242,23 +279,23 @@ export default function DetailPanel({
                   </div>
                 </div>
                 {paper.authors.length > 0 && (
-                  <div style={{ color: '#666', fontSize: '0.8rem', marginTop: 2 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 2 }}>
                     {paper.authors.join(', ')}
                   </div>
                 )}
                 {paper.journal && (
-                  <div style={{ color: '#888', fontSize: '0.75rem', marginTop: 2, fontStyle: 'italic' }}>
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', marginTop: 2, fontStyle: 'italic' }}>
                     {paper.journal}
                   </div>
                 )}
                 {paper.abstract && (
-                  <div style={{ color: '#777', fontSize: '0.8rem', marginTop: 4 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 4 }}>
                     {paper.abstract.slice(0, 120)}
                     {paper.abstract.length > 120 ? '...' : ''}
                   </div>
                 )}
                 {paper.comment && (
-                  <div style={{ color: '#5a7d9a', fontSize: '0.75rem', marginTop: 4, fontStyle: 'italic', borderLeft: '2px solid #a8dadc', paddingLeft: 6 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 4, fontStyle: 'italic', borderLeft: '2px solid var(--accent-forward)', paddingLeft: 6 }}>
                     {paper.comment}
                   </div>
                 )}
@@ -276,16 +313,26 @@ export default function DetailPanel({
                     }
                     if (imageFiles.length > 0 && onUpdatePaper) {
                       e.preventDefault();
-                      Promise.all(imageFiles.map((f) => {
-                        return new Promise<string>((res, rej) => {
-                          const reader = new FileReader();
-                          reader.onload = () => res(reader.result as string);
-                          reader.onerror = rej;
-                          reader.readAsDataURL(f);
+                      const ghConfig = getGitHubConfig();
+                      const existingCount = (paper.figureUrls ?? []).length;
+                      if (ghConfig) {
+                        Promise.all(imageFiles.map((f, fi) =>
+                          uploadFigure(ghConfig, paper.id, f, existingCount + fi),
+                        )).then((newUrls) => {
+                          onUpdatePaper({ ...paper, figureUrls: [...(paper.figureUrls ?? []), ...newUrls] });
                         });
-                      })).then((newUrls) => {
-                        onUpdatePaper({ ...paper, figureUrls: [...(paper.figureUrls ?? []), ...newUrls] });
-                      });
+                      } else {
+                        Promise.all(imageFiles.map((f) => {
+                          return new Promise<string>((res, rej) => {
+                            const reader = new FileReader();
+                            reader.onload = () => res(reader.result as string);
+                            reader.onerror = rej;
+                            reader.readAsDataURL(f);
+                          });
+                        })).then((newUrls) => {
+                          onUpdatePaper({ ...paper, figureUrls: [...(paper.figureUrls ?? []), ...newUrls] });
+                        });
+                      }
                     }
                   }}
                   tabIndex={0}
@@ -301,7 +348,7 @@ export default function DetailPanel({
                         height: 48,
                         objectFit: 'cover',
                         borderRadius: 4,
-                        border: '1px solid #ddd',
+                        border: '1px solid var(--border-secondary)',
                         cursor: 'pointer',
                       }}
                     />
@@ -312,13 +359,13 @@ export default function DetailPanel({
                         width: 48,
                         height: 48,
                         borderRadius: 4,
-                        border: '1px dashed #ccc',
+                        border: '1px dashed var(--border-input)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
                         cursor: 'pointer',
                         fontSize: '1.2rem',
-                        color: '#aaa',
+                        color: 'var(--text-muted)',
                         flexShrink: 0,
                       }}
                       title="Add figure (or Ctrl+V paste)"
@@ -332,16 +379,26 @@ export default function DetailPanel({
                         onChange={(e) => {
                           const files = Array.from(e.target.files ?? []);
                           if (files.length === 0) return;
-                          Promise.all(files.map((f) => {
-                            return new Promise<string>((res, rej) => {
-                              const reader = new FileReader();
-                              reader.onload = () => res(reader.result as string);
-                              reader.onerror = rej;
-                              reader.readAsDataURL(f);
+                          const ghConfig = getGitHubConfig();
+                          const existingCount = (paper.figureUrls ?? []).length;
+                          if (ghConfig) {
+                            Promise.all(files.map((f, fi) =>
+                              uploadFigure(ghConfig, paper.id, f, existingCount + fi),
+                            )).then((newUrls) => {
+                              onUpdatePaper({ ...paper, figureUrls: [...(paper.figureUrls ?? []), ...newUrls] });
                             });
-                          })).then((newUrls) => {
-                            onUpdatePaper({ ...paper, figureUrls: [...(paper.figureUrls ?? []), ...newUrls] });
-                          });
+                          } else {
+                            Promise.all(files.map((f) => {
+                              return new Promise<string>((res, rej) => {
+                                const reader = new FileReader();
+                                reader.onload = () => res(reader.result as string);
+                                reader.onerror = rej;
+                                reader.readAsDataURL(f);
+                              });
+                            })).then((newUrls) => {
+                              onUpdatePaper({ ...paper, figureUrls: [...(paper.figureUrls ?? []), ...newUrls] });
+                            });
+                          }
                           e.target.value = '';
                         }}
                       />
@@ -353,13 +410,13 @@ export default function DetailPanel({
                     href={paper.url.startsWith('http') ? paper.url : `https://doi.org/${paper.url}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ fontSize: '0.75rem', color: '#2a9d8f' }}
+                    style={{ fontSize: '0.75rem', color: 'var(--accent-forward)' }}
                   >
                     DOI link
                   </a>
                 )}
                 {crossRefs.length > 0 && (
-                  <div style={{ fontSize: '0.75rem', color: '#999', marginTop: 4 }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>
                     Also in:{' '}
                     {crossRefs.map((ref, i) => (
                       <span key={`${ref.type}-${ref.id}`}>
@@ -375,7 +432,7 @@ export default function DetailPanel({
                           style={{
                             cursor: 'pointer',
                             textDecoration: 'underline',
-                            color: ref.direction === 'forward' ? '#2a9d8f' : '#e76f51',
+                            color: ref.direction === 'forward' ? 'var(--accent-forward)' : 'var(--accent-backward)',
                           }}
                         >
                           {ref.type === 'bridge' ? 'Bridge' : 'Road'}: {ref.label}
@@ -389,50 +446,229 @@ export default function DetailPanel({
           })}
         </div>
 
-        {/* Edit paper */}
-        {editingPaper && onUpdatePaper && (
-          <div style={{ marginTop: 8, padding: 8, background: '#f0f8ff', borderRadius: 6, border: '1px solid #b0d4f1' }}>
-            <div style={{ fontSize: '0.75rem', color: '#555', marginBottom: 4, fontWeight: 600 }}>Edit Paper</div>
-            <PaperForm
-              initialPaper={editingPaper}
-              onSubmit={(paper) => {
-                onUpdatePaper(paper);
-                setEditingPaper(null);
+        {/* Add/Edit paper — no inline form, buttons open modal */}
+        {!editingPaper ? (
+          <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+            <button
+              onClick={() => setShowPaperForm(true)}
+              style={{
+                padding: '6px 12px',
+                background: 'var(--btn-secondary-bg)',
+                border: '1px dashed var(--btn-secondary-border)',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                color: 'var(--text-secondary)',
               }}
-              onCancel={() => setEditingPaper(null)}
-            />
+            >
+              + Add Paper
+            </button>
+            <button
+              onClick={async () => {
+                const config = getClaudeConfig();
+                if (!config) {
+                  setShowClaudeSettings(true);
+                  return;
+                }
+                setAiLoading(true);
+                setAiError(null);
+                setAiSuggestions([]);
+                try {
+                  const linkedGaps = gaps.filter((g) => (entity?.gapIds ?? []).includes(g.id));
+                  const result = await suggestPapers(
+                    config,
+                    entity!,
+                    sourceLabel ?? 'Source',
+                    targetLabel ?? 'Target',
+                    linkedPapers,
+                    linkedGaps,
+                  );
+                  setAiSuggestions(result);
+                } catch (e) {
+                  setAiError((e as Error).message);
+                } finally {
+                  setAiLoading(false);
+                }
+              }}
+              disabled={aiLoading}
+              style={{
+                padding: '6px 12px',
+                background: aiLoading ? 'var(--btn-secondary-bg)' : 'var(--bg-ai)',
+                border: '1px dashed var(--border-ai)',
+                borderRadius: 4,
+                cursor: aiLoading ? 'default' : 'pointer',
+                fontSize: '0.8rem',
+                color: 'var(--text-ai)',
+              }}
+            >
+              {aiLoading ? 'AI 검색 중...' : 'AI 논문 제안'}
+            </button>
+          </div>
+        ) : null}
+
+        {/* AI Suggestion Results */}
+        {aiError && (
+          <div style={{
+            marginTop: 8,
+            padding: '8px 10px',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 6,
+            fontSize: '0.8rem',
+            color: '#dc2626',
+          }}>
+            {aiError}
+            <button
+              onClick={() => setShowClaudeSettings(true)}
+              style={{ marginLeft: 8, fontSize: '0.75rem', color: 'var(--text-ai)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              API 설정
+            </button>
           </div>
         )}
-
-        {/* Add paper */}
-        {!editingPaper && showPaperForm ? (
+        {aiSuggestions.length > 0 && (
           <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: '0.8rem', color: 'var(--text-ai)', fontWeight: 600, marginBottom: 6 }}>
+              AI 제안 ({aiSuggestions.length})
+            </div>
+            {aiSuggestions.map((sug, idx) => (
+              <div
+                key={idx}
+                style={{
+                  padding: '8px 10px',
+                  background: 'var(--bg-ai)',
+                  borderRadius: 6,
+                  border: '1px solid var(--border-ai)',
+                  fontSize: '0.8rem',
+                  marginBottom: 6,
+                }}
+              >
+                <div style={{ fontWeight: 'bold' }}>
+                  {sug.title} <span style={{ fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({sug.year})</span>
+                </div>
+                {sug.authors.length > 0 && (
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 2 }}>
+                    {sug.authors.join(', ')}
+                  </div>
+                )}
+                {sug.journal && (
+                  <div style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem', fontStyle: 'italic', marginTop: 1 }}>
+                    {sug.journal}
+                  </div>
+                )}
+                <div style={{ color: 'var(--text-ai)', fontSize: '0.75rem', marginTop: 4 }}>
+                  {sug.relevance}
+                </div>
+                {sug.addressesGap && sug.addressesGap !== 'null' && (
+                  <div style={{ color: '#b45309', fontSize: '0.7rem', marginTop: 2 }}>
+                    Gap: {sug.addressesGap}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <button
+                    onClick={() => {
+                      const paper: Paper = {
+                        id: generateId(),
+                        title: sug.title,
+                        authors: sug.authors,
+                        year: sug.year,
+                        journal: sug.journal,
+                        url: sug.url,
+                        comment: sug.relevance,
+                        source: 'manual',
+                        createdAt: new Date().toISOString(),
+                      };
+                      onAddPaper(paper);
+                      setAiSuggestions((prev) => prev.filter((_, i) => i !== idx));
+                    }}
+                    style={{
+                      padding: '3px 10px',
+                      background: 'var(--accent-forward)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    추가
+                  </button>
+                  <button
+                    onClick={() => setAiSuggestions((prev) => prev.filter((_, i) => i !== idx))}
+                    style={{
+                      padding: '3px 10px',
+                      background: 'var(--btn-secondary-bg)',
+                      border: 'none',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      fontSize: '0.75rem',
+                    }}
+                  >
+                    무시
+                  </button>
+                  {sug.url && (
+                    <a
+                      href={sug.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: '0.7rem', color: 'var(--accent-forward)', alignSelf: 'center' }}
+                    >
+                      DOI
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Paper form modal */}
+      {(showPaperForm || editingPaper) && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'var(--bg-modal-overlay)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+          onClick={() => { setShowPaperForm(false); setEditingPaper(null); }}
+        >
+          <div
+            style={{
+              background: 'var(--bg-primary)',
+              borderRadius: 10,
+              padding: 24,
+              width: 480,
+              maxWidth: '90vw',
+              maxHeight: '85vh',
+              overflowY: 'auto',
+              boxShadow: 'var(--shadow-dropdown)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: '1rem', color: 'var(--text-heading)' }}>
+              {editingPaper ? 'Edit Paper' : 'Add Paper'}
+            </h3>
             <PaperForm
+              initialPaper={editingPaper ?? undefined}
               onSubmit={(paper) => {
-                onAddPaper(paper);
-                setShowPaperForm(false);
+                if (editingPaper && onUpdatePaper) {
+                  onUpdatePaper(paper);
+                  setEditingPaper(null);
+                } else {
+                  onAddPaper(paper);
+                  setShowPaperForm(false);
+                }
               }}
-              onCancel={() => setShowPaperForm(false)}
+              onCancel={() => { setShowPaperForm(false); setEditingPaper(null); }}
             />
           </div>
-        ) : !editingPaper ? (
-          <button
-            onClick={() => setShowPaperForm(true)}
-            style={{
-              marginTop: 8,
-              padding: '6px 12px',
-              background: '#f8f9fa',
-              border: '1px dashed #adb5bd',
-              borderRadius: 4,
-              cursor: 'pointer',
-              fontSize: '0.8rem',
-              color: '#666',
-            }}
-          >
-            + Add Paper
-          </button>
-        ) : null}
-      </div>
+        </div>
+      )}
 
       {lightbox && (
         <FigureLightbox
@@ -441,6 +677,9 @@ export default function DetailPanel({
           onChangeIndex={(i) => setLightbox({ ...lightbox, index: i })}
           onClose={() => setLightbox(null)}
         />
+      )}
+      {showClaudeSettings && (
+        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
       )}
     </aside>
   );

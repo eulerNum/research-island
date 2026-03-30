@@ -90,6 +90,7 @@ export default function FigureLightbox({
             borderRadius: '50%',
             width: 28,
             height: 28,
+            color: '#333',
             fontSize: '1rem',
             cursor: 'pointer',
             display: 'flex',

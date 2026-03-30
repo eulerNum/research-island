@@ -1,7 +1,8 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import * as d3 from 'd3';
-import type { ResearchMap, Island } from '../services/types';
+import type { ResearchMap, Island, Bridge } from '../services/types';
 import type { ToolbarMode } from '../hooks/useToolbar';
+import * as mapService from '../services/mapService';
 
 export interface MapContextMenuEvent {
   type: 'island' | 'bridge';
@@ -203,12 +204,46 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'middle')
       .attr('font-size', '11px')
-      .attr('fill', '#555')
+      .attr('fill', 'var(--text-secondary)')
       .attr('pointer-events', 'none')
       .text((d) => {
         const label = d.label ?? '';
         return label.length > 30 ? label.slice(0, 28) + '...' : label;
       });
+
+    // Bridge paper count badge — validate against actual papers
+    const paperIdSet = new Set(data.papers.map((p) => p.id));
+
+    // Debug: log bridge paperIds to console for troubleshooting
+    for (const b of data.bridges) {
+      const valid = b.paperIds.filter((pid) => paperIdSet.has(pid));
+      const orphaned = b.paperIds.filter((pid) => !paperIdSet.has(pid));
+      if (orphaned.length > 0) {
+        console.warn(`[IslandMap] Bridge "${b.label}" has ${orphaned.length} orphaned paperIds:`, orphaned);
+      }
+      if (valid.length !== b.paperIds.length) {
+        console.warn(`[IslandMap] Bridge "${b.label}" paperIds: ${b.paperIds.length} total, ${valid.length} valid`);
+      }
+    }
+
+    const bridgeBadges = bridgeGroups
+      .filter((d) => d.paperIds.filter((pid) => paperIdSet.has(pid)).length > 0)
+      .append('g')
+      .attr('class', 'bridge-badge')
+      .attr('pointer-events', 'none');
+    bridgeBadges
+      .append('circle')
+      .attr('r', 9)
+      .attr('fill', 'var(--bg-badge)')
+      .attr('opacity', 0.8);
+    bridgeBadges
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('font-size', '9px')
+      .attr('fill', 'var(--btn-active-text)')
+      .attr('font-weight', 'bold')
+      .text((d) => d.paperIds.filter((pid) => paperIdSet.has(pid)).length);
 
     // Island ellipses
     const islandGroups = g
@@ -234,7 +269,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .attr('ry', 50)
       .attr('fill', (d) => d.island.color ?? '#8ecae6')
       .attr('stroke', (d) =>
-        connectionStartRef.current === d.island.id ? '#e76f51' : '#023047',
+        connectionStartRef.current === d.island.id ? '#e76f51' : 'var(--island-stroke)',
       )
       .attr('stroke-width', (d) =>
         connectionStartRef.current === d.island.id ? 4 : 2,
@@ -247,52 +282,50 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .attr('dominant-baseline', 'middle')
       .attr('font-size', '14px')
       .attr('font-weight', 'bold')
-      .attr('fill', '#023047')
+      .attr('fill', 'var(--text-heading)')
       .attr('pointer-events', 'none')
+      .attr('y', -8)
       .text((d) => d.island.name);
 
-    // Compute bridge SVG path with curve offset for parallel bridges.
-    // Perpendicular direction is always computed from the sorted pair
-    // so A→B and B→A curves bend to *different* sides.
-    function bridgePath(d: (typeof data.bridges)[0]): string {
-      const s = nodeMap.get(d.sourceIslandId);
-      const t = nodeMap.get(d.targetIslandId);
-      if (!s || !t) return '';
-      const x1 = s.x!, y1 = s.y!, x2 = t.x!, y2 = t.y!;
-      const key = pairKey(d.sourceIslandId, d.targetIslandId);
-      const total = pairCountMap.get(key) ?? 1;
-      const idx = bridgeOffsets.get(d.id) ?? 0;
-      if (total <= 1) {
-        return `M${x1},${y1} L${x2},${y2}`;
-      }
-      const SPREAD = 50;
-      const offset = (idx - (total - 1) / 2) * SPREAD;
-      // Always compute perpendicular from sorted-pair direction
-      // so the offset is consistent regardless of source→target order.
-      const [sortedA, sortedB] = [d.sourceIslandId, d.targetIslandId].sort();
-      const sA = nodeMap.get(sortedA)!;
-      const sB = nodeMap.get(sortedB)!;
-      const pdx = sB.x! - sA.x!;
-      const pdy = sB.y! - sA.y!;
-      const len = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
-      const nx = -pdy / len;
-      const ny = pdx / len;
-      const mx = (x1 + x2) / 2 + nx * offset;
-      const my = (y1 + y2) / 2 + ny * offset;
-      return `M${x1},${y1} Q${mx},${my} ${x2},${y2}`;
-    }
+    // Sub-info: city count + unique papers (deduplicated across cities and bridges)
+    islandGroups
+      .append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'middle')
+      .attr('font-size', '10px')
+      .attr('fill', 'var(--text-secondary)')
+      .attr('pointer-events', 'none')
+      .attr('y', 10)
+      .text((d) => {
+        const cityCount = d.island.cities.length;
+        const paperIdSet = new Set<string>();
+        for (const c of d.island.cities) {
+          for (const pid of c.paperIds) paperIdSet.add(pid);
+        }
+        for (const b of data.bridges) {
+          if (b.sourceIslandId === d.island.id || b.targetIslandId === d.island.id) {
+            for (const pid of b.paperIds) paperIdSet.add(pid);
+          }
+        }
+        return `${cityCount} cities · ${paperIdSet.size} papers`;
+      });
 
-    // Compute label position at midpoint of bridge (accounting for curve)
-    function bridgeMidpoint(d: (typeof data.bridges)[0]): { x: number; y: number } {
+    // Compute the Quadratic Bezier control point for a bridge.
+    // If a custom controlPoint is saved, use it. Otherwise auto-compute from parallel offset.
+    function bridgeControlPoint(d: Bridge): { x: number; y: number } {
       const s = nodeMap.get(d.sourceIslandId);
       const t = nodeMap.get(d.targetIslandId);
       if (!s || !t) return { x: 0, y: 0 };
       const x1 = s.x!, y1 = s.y!, x2 = t.x!, y2 = t.y!;
+
+      if (d.controlPoint) return d.controlPoint;
+
       const key = pairKey(d.sourceIslandId, d.targetIslandId);
       const total = pairCountMap.get(key) ?? 1;
       const idx = bridgeOffsets.get(d.id) ?? 0;
       if (total <= 1) {
-        return { x: (x1 + x2) / 2, y: (x1 + x2) === 0 ? (y1 + y2) / 2 : (y1 + y2) / 2 - 10 };
+        // Straight line: control point = midpoint
+        return { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
       }
       const SPREAD = 50;
       const offset = (idx - (total - 1) / 2) * SPREAD;
@@ -304,11 +337,85 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       const len = Math.sqrt(pdx * pdx + pdy * pdy) || 1;
       const nx = -pdy / len;
       const ny = pdx / len;
-      // Quadratic bezier midpoint at t=0.5: 0.25*P0 + 0.5*CP + 0.25*P1
-      const cpx = (x1 + x2) / 2 + nx * offset;
-      const cpy = (y1 + y2) / 2 + ny * offset;
-      return { x: 0.25 * x1 + 0.5 * cpx + 0.25 * x2, y: 0.25 * y1 + 0.5 * cpy + 0.25 * y2 };
+      return { x: (x1 + x2) / 2 + nx * offset, y: (y1 + y2) / 2 + ny * offset };
     }
+
+    function bridgePath(d: Bridge): string {
+      const s = nodeMap.get(d.sourceIslandId);
+      const t = nodeMap.get(d.targetIslandId);
+      if (!s || !t) return '';
+      const x1 = s.x!, y1 = s.y!, x2 = t.x!, y2 = t.y!;
+      const cp = bridgeControlPoint(d);
+      // If control point is exactly midpoint (straight line), render as L for cleaner look
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      if (!d.controlPoint && Math.abs(cp.x - mx) < 1 && Math.abs(cp.y - my) < 1) {
+        return `M${x1},${y1} L${x2},${y2}`;
+      }
+      return `M${x1},${y1} Q${cp.x},${cp.y} ${x2},${y2}`;
+    }
+
+    // Visual midpoint of Quadratic Bezier at t=0.5: 0.25*P0 + 0.5*CP + 0.25*P2
+    function bridgeMidpoint(d: Bridge): { x: number; y: number } {
+      const s = nodeMap.get(d.sourceIslandId);
+      const t = nodeMap.get(d.targetIslandId);
+      if (!s || !t) return { x: 0, y: 0 };
+      const cp = bridgeControlPoint(d);
+      return {
+        x: 0.25 * s.x! + 0.5 * cp.x + 0.25 * t.x!,
+        y: 0.25 * s.y! + 0.5 * cp.y + 0.25 * t.y!,
+      };
+    }
+
+    // Curve drag handles — small circle at bridge midpoint, draggable in select mode
+    const curveHandles = g
+      .selectAll<SVGCircleElement, Bridge>('.curve-handle')
+      .data(data.bridges)
+      .enter()
+      .append('circle')
+      .attr('class', 'curve-handle')
+      .attr('r', 6)
+      .attr('fill', 'var(--accent-forward)')
+      .attr('fill-opacity', 0)
+      .attr('stroke', 'var(--accent-forward)')
+      .attr('stroke-opacity', 0)
+      .attr('stroke-width', 1.5)
+      .attr('cursor', 'grab');
+
+    // Show handles on hover
+    curveHandles
+      .on('mouseenter', function () {
+        if (modeRef.current !== 'select') return;
+        d3.select(this).attr('fill-opacity', 0.3).attr('stroke-opacity', 0.8);
+      })
+      .on('mouseleave', function () {
+        d3.select(this).attr('fill-opacity', 0).attr('stroke-opacity', 0);
+      });
+
+    // Drag to adjust curve
+    const curveDrag = d3
+      .drag<SVGCircleElement, Bridge>()
+      .filter(() => modeRef.current === 'select')
+      .on('start', function () {
+        d3.select(this).attr('fill-opacity', 0.5).attr('stroke-opacity', 1).attr('cursor', 'grabbing');
+      })
+      .on('drag', function (event, d) {
+        // The user drags the visual midpoint. Convert to control point:
+        // midpoint = 0.25*P0 + 0.5*CP + 0.25*P2  =>  CP = 2*midpoint - 0.5*(P0+P2)
+        const s = nodeMap.get(d.sourceIslandId);
+        const t = nodeMap.get(d.targetIslandId);
+        if (!s || !t) return;
+        const cpx = 2 * event.x - 0.5 * (s.x! + t.x!);
+        const cpy = 2 * event.y - 0.5 * (s.y! + t.y!);
+        d.controlPoint = { x: cpx, y: cpy };
+        updatePositions();
+      })
+      .on('end', function (_event, d) {
+        d3.select(this).attr('fill-opacity', 0).attr('stroke-opacity', 0).attr('cursor', 'grab');
+        if (d.controlPoint) {
+          mapService.updateBridgeControlPoint(d.id, d.controlPoint);
+        }
+      });
+    curveHandles.call(curveDrag);
 
     // Update positions function
     function updatePositions() {
@@ -318,6 +425,14 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       bridgeLabels.each(function (d) {
         const mid = bridgeMidpoint(d);
         d3.select(this).attr('x', mid.x).attr('y', mid.y - 10);
+      });
+      bridgeBadges.each(function (d) {
+        const mid = bridgeMidpoint(d);
+        d3.select(this).attr('transform', `translate(${mid.x},${mid.y + 8})`);
+      });
+      curveHandles.each(function (d) {
+        const mid = bridgeMidpoint(d);
+        d3.select(this).attr('cx', mid.x).attr('cy', mid.y);
       });
     }
 
@@ -412,7 +527,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       style={{
         width: '100%',
         height: '100%',
-        background: 'linear-gradient(180deg, #e8f4f8 0%, #f0f4f8 100%)',
+        background: 'var(--bg-map)',
       }}
     />
   );

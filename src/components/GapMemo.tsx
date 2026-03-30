@@ -31,7 +31,7 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
 
   return (
     <div>
-      <h4 style={{ fontSize: '0.85rem', color: '#555', marginBottom: 8 }}>
+      <h4 style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 8 }}>
         Research Gaps ({linkedGaps.length})
       </h4>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -39,10 +39,10 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
           <div
             key={gap.id}
             style={{
-              background: '#fff8dc',
+              background: 'var(--bg-gap)',
               padding: '8px 10px',
               borderRadius: 6,
-              border: '1px solid #f0e68c',
+              border: '1px solid var(--border-gap)',
               fontSize: '0.85rem',
               display: 'flex',
               justifyContent: 'space-between',
@@ -56,7 +56,7 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#999',
+                color: 'var(--text-muted)',
                 cursor: 'pointer',
                 fontSize: '1rem',
                 marginLeft: 6,
@@ -78,10 +78,12 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
               width: '100%',
               minHeight: 60,
               padding: 8,
-              border: '1px solid #ccc',
+              border: '1px solid var(--border-input)',
               borderRadius: 4,
               fontSize: '0.85rem',
               resize: 'vertical',
+              background: 'var(--bg-input)',
+              color: 'var(--text-primary)',
             }}
             autoFocus
           />
@@ -90,7 +92,7 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
               onClick={handleAdd}
               style={{
                 padding: '4px 12px',
-                background: '#2a9d8f',
+                background: 'var(--accent-forward)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 4,
@@ -104,11 +106,12 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
               onClick={() => { setIsAdding(false); setText(''); }}
               style={{
                 padding: '4px 12px',
-                background: '#eee',
+                background: 'var(--btn-secondary-bg)',
                 border: 'none',
                 borderRadius: 4,
                 cursor: 'pointer',
                 fontSize: '0.8rem',
+                color: 'var(--text-primary)',
               }}
             >
               Cancel
@@ -121,12 +124,12 @@ export default function GapMemo({ gaps, gapIds, onAddGap, onDeleteGap }: GapMemo
           style={{
             marginTop: 8,
             padding: '4px 10px',
-            background: '#fff8dc',
-            border: '1px dashed #f0e68c',
+            background: 'var(--bg-gap)',
+            border: '1px dashed var(--border-gap)',
             borderRadius: 4,
             cursor: 'pointer',
             fontSize: '0.8rem',
-            color: '#666',
+            color: 'var(--text-secondary)',
           }}
         >
           + Gap Memo

@@ -55,8 +55,8 @@ export default function OverviewPage() {
             const sourceName = ctx.mapData.islands.find((i) => i.id === sourceId)?.name ?? '';
             const targetName = ctx.mapData.islands.find((i) => i.id === islandId)?.name ?? '';
             setPromptDialog({
-              title: '다리 이름 (Bridge label)',
-              defaultValue: `${sourceName} → ${targetName}: `,
+              title: `다리 이름: ${sourceName} → ${targetName}`,
+              defaultValue: '',
               onConfirm: (label: string) => {
                 ctx.addBridge(sourceId, islandId, 'forward', label);
                 setPromptDialog(null);
@@ -109,6 +109,21 @@ export default function OverviewPage() {
       }
     }
     return map;
+  }, [ctx.mapData.islands]);
+
+  // Name lookup maps for cross-ref display
+  const islandNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of ctx.mapData.islands) m.set(i.id, i.name);
+    return m;
+  }, [ctx.mapData.islands]);
+
+  const cityNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of ctx.mapData.islands) {
+      for (const c of i.cities) m.set(c.id, c.name);
+    }
+    return m;
   }, [ctx.mapData.islands]);
 
   const handleNavigateToBridge = useCallback((bridgeId: string) => {
@@ -247,7 +262,11 @@ export default function OverviewPage() {
             allBridges={ctx.mapData.bridges}
             allRoads={ctx.mapData.roads}
             allIslandCityMap={cityIslandMap}
+            islandNameMap={islandNameMap}
+            cityNameMap={cityNameMap}
             highlightedPaperId={highlightedPaperId}
+            sourceLabel={islandNameMap.get(selectedBridge.sourceIslandId)}
+            targetLabel={islandNameMap.get(selectedBridge.targetIslandId)}
             onAddPaper={(paper) => {
               const actualId = ctx.addPaper(paper);
               ctx.addPaperToBridge(actualId, selectedBridge.id);

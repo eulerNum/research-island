@@ -58,8 +58,8 @@ export default function IslandDetailPage() {
             const sourceName = island?.cities.find((c) => c.id === sourceId)?.name ?? '';
             const targetName = island?.cities.find((c) => c.id === cityId)?.name ?? '';
             setPromptDialog({
-              title: '도로 이름 (Road label)',
-              defaultValue: `${sourceName} → ${targetName}: `,
+              title: `도로 이름: ${sourceName} → ${targetName}`,
+              defaultValue: '',
               onConfirm: (label: string) => {
                 ctx.addRoad(sourceId, cityId, 'forward', label);
                 setPromptDialog(null);
@@ -110,6 +110,20 @@ export default function IslandDetailPage() {
       }
     }
     return map;
+  }, [ctx.mapData.islands]);
+
+  const islandNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of ctx.mapData.islands) m.set(i.id, i.name);
+    return m;
+  }, [ctx.mapData.islands]);
+
+  const cityNameMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const i of ctx.mapData.islands) {
+      for (const c of i.cities) m.set(c.id, c.name);
+    }
+    return m;
   }, [ctx.mapData.islands]);
 
   const handleNavigateToBridge = useCallback((bridgeId: string) => {
@@ -227,9 +241,9 @@ export default function IslandDetailPage() {
               left: 12,
               zIndex: 10,
               padding: '6px 14px',
-              border: '1px solid #ccc',
+              border: '1px solid var(--btn-secondary-border)',
               borderRadius: 6,
-              background: '#fff',
+              background: 'var(--bg-primary)',
               cursor: 'pointer',
               fontSize: '0.85rem',
             }}
@@ -248,7 +262,7 @@ export default function IslandDetailPage() {
               borderRadius: 8,
               fontWeight: 'bold',
               fontSize: '1rem',
-              color: '#023047',
+              color: 'var(--text-heading)',
             }}
           >
             {island.name}
@@ -275,7 +289,11 @@ export default function IslandDetailPage() {
             allBridges={ctx.mapData.bridges}
             allRoads={ctx.mapData.roads}
             allIslandCityMap={cityIslandMap}
+            islandNameMap={islandNameMap}
+            cityNameMap={cityNameMap}
             highlightedPaperId={highlightedPaperId}
+            sourceLabel={island.cities.find((c) => c.id === selectedRoad.sourceCityId)?.name}
+            targetLabel={island.cities.find((c) => c.id === selectedRoad.targetCityId)?.name}
             onAddPaper={(paper) => {
               const actualId = ctx.addPaper(paper);
               ctx.addPaperToRoad(actualId, selectedRoad.id);

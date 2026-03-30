@@ -39,11 +39,6 @@ function pushUndo(): void {
   redoStack.length = 0; // clear redo on new action
 }
 
-/** Save with undo tracking (for data mutations) */
-function saveWithUndo(map: ResearchMap): void {
-  pushUndo();
-  saveMap(map);
-}
 
 export function undo(): boolean {
   const snapshot = undoStack.pop();
@@ -78,18 +73,21 @@ export function getIslands(): Island[] {
 }
 
 export function addIsland(island: Island): void {
+  pushUndo();
   const map = loadMap();
   map.islands.push(island);
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 export function updateIsland(island: Island): void {
+  pushUndo();
   const map = loadMap();
   map.islands = map.islands.map((i) => (i.id === island.id ? island : i));
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 export function deleteIsland(id: string): void {
+  pushUndo();
   const map = loadMap();
   const island = map.islands.find((i) => i.id === id);
   if (island) {
@@ -102,7 +100,7 @@ export function deleteIsland(id: string): void {
   map.bridges = map.bridges.filter(
     (b) => b.sourceIslandId !== id && b.targetIslandId !== id,
   );
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 /** Update island position only — no React state refresh needed */
@@ -143,24 +141,27 @@ export function getCities(islandId: string): City[] {
 }
 
 export function addCity(islandId: string, city: City): void {
+  pushUndo();
   const map = loadMap();
   const island = map.islands.find((i) => i.id === islandId);
   if (island) {
     island.cities.push(city);
-    saveWithUndo(map);
+    saveMap(map);
   }
 }
 
 export function updateCity(islandId: string, city: City): void {
+  pushUndo();
   const map = loadMap();
   const island = map.islands.find((i) => i.id === islandId);
   if (island) {
     island.cities = island.cities.map((c) => (c.id === city.id ? city : c));
-    saveWithUndo(map);
+    saveMap(map);
   }
 }
 
 export function deleteCity(islandId: string, cityId: string): void {
+  pushUndo();
   const map = loadMap();
   const island = map.islands.find((i) => i.id === islandId);
   if (island) {
@@ -169,7 +170,7 @@ export function deleteCity(islandId: string, cityId: string): void {
   map.roads = map.roads.filter(
     (r) => r.sourceCityId !== cityId && r.targetCityId !== cityId,
   );
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 // ─── Bridges ────────────────────────────────────────────────
@@ -179,21 +180,37 @@ export function getBridges(): Bridge[] {
 }
 
 export function addBridge(bridge: Bridge): void {
+  pushUndo();
   const map = loadMap();
   map.bridges.push(bridge);
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 export function updateBridge(bridge: Bridge): void {
+  pushUndo();
   const map = loadMap();
   map.bridges = map.bridges.map((b) => (b.id === bridge.id ? bridge : b));
-  saveWithUndo(map);
+  saveMap(map);
+}
+
+/** Update bridge control point only — no React re-render needed (D3 handles visuals) */
+export function updateBridgeControlPoint(
+  id: string,
+  controlPoint: { x: number; y: number },
+): void {
+  const map = loadMap();
+  const bridge = map.bridges.find((b) => b.id === id);
+  if (bridge) {
+    bridge.controlPoint = controlPoint;
+    saveMap(map);
+  }
 }
 
 export function deleteBridge(id: string): void {
+  pushUndo();
   const map = loadMap();
   map.bridges = map.bridges.filter((b) => b.id !== id);
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 // ─── Roads ──────────────────────────────────────────────────
@@ -203,21 +220,37 @@ export function getRoads(): Road[] {
 }
 
 export function addRoad(road: Road): void {
+  pushUndo();
   const map = loadMap();
   map.roads.push(road);
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 export function updateRoad(road: Road): void {
+  pushUndo();
   const map = loadMap();
   map.roads = map.roads.map((r) => (r.id === road.id ? road : r));
-  saveWithUndo(map);
+  saveMap(map);
+}
+
+/** Update road control point only — no React re-render needed */
+export function updateRoadControlPoint(
+  id: string,
+  controlPoint: { x: number; y: number },
+): void {
+  const map = loadMap();
+  const road = map.roads.find((r) => r.id === id);
+  if (road) {
+    road.controlPoint = controlPoint;
+    saveMap(map);
+  }
 }
 
 export function deleteRoad(id: string): void {
+  pushUndo();
   const map = loadMap();
   map.roads = map.roads.filter((r) => r.id !== id);
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 // ─── Papers ─────────────────────────────────────────────────
@@ -237,8 +270,9 @@ export function addPaper(paper: Paper): string {
   if (existing) {
     return existing.id;
   }
+  pushUndo();
   map.papers.push(paper);
-  saveWithUndo(map);
+  saveMap(map);
   return paper.id;
 }
 
@@ -249,12 +283,14 @@ export function getGaps(): ResearchGap[] {
 }
 
 export function addGap(gap: ResearchGap): void {
+  pushUndo();
   const map = loadMap();
   map.gaps.push(gap);
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 export function deleteGap(id: string): void {
+  pushUndo();
   const map = loadMap();
   map.gaps = map.gaps.filter((g) => g.id !== id);
   map.bridges.forEach((b) => {
@@ -263,18 +299,20 @@ export function deleteGap(id: string): void {
   map.roads.forEach((r) => {
     r.gapIds = r.gapIds.filter((gid) => gid !== id);
   });
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 // ─── Papers (extended) ─────────────────────────────────────
 
 export function updatePaper(paper: Paper): void {
+  pushUndo();
   const map = loadMap();
   map.papers = map.papers.map((p) => (p.id === paper.id ? paper : p));
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 export function deletePaper(id: string): void {
+  pushUndo();
   const map = loadMap();
   map.papers = map.papers.filter((p) => p.id !== id);
   map.bridges.forEach((b) => {
@@ -288,13 +326,39 @@ export function deletePaper(id: string): void {
       city.paperIds = city.paperIds.filter((pid) => pid !== id);
     });
   });
-  saveWithUndo(map);
+  saveMap(map);
 }
 
 // ─── Full Map ───────────────────────────────────────────────
 
 export function getFullMap(): ResearchMap {
-  return structuredClone(loadMap());
+  const map = structuredClone(loadMap());
+  // Clean up orphaned paperIds (paperIds referencing non-existent papers)
+  const validPaperIds = new Set(map.papers.map((p) => p.id));
+  let cleaned = false;
+  for (const b of map.bridges) {
+    const before = b.paperIds.length;
+    b.paperIds = b.paperIds.filter((pid) => validPaperIds.has(pid));
+    if (b.paperIds.length !== before) cleaned = true;
+  }
+  for (const r of map.roads) {
+    const before = r.paperIds.length;
+    r.paperIds = r.paperIds.filter((pid) => validPaperIds.has(pid));
+    if (r.paperIds.length !== before) cleaned = true;
+  }
+  for (const island of map.islands) {
+    for (const city of island.cities) {
+      const before = city.paperIds.length;
+      city.paperIds = city.paperIds.filter((pid) => validPaperIds.has(pid));
+      if (city.paperIds.length !== before) cleaned = true;
+    }
+  }
+  if (cleaned) {
+    // Persist the cleanup to cache + localStorage
+    cache = structuredClone(map);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+  }
+  return map;
 }
 
 export function importMap(map: ResearchMap): void {

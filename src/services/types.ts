@@ -59,6 +59,7 @@ export interface Bridge {
   direction: BridgeDirection;
   label?: string;
   color?: string;
+  controlPoint?: { x: number; y: number };
   paperIds: string[];
   gapIds: string[];
 }
@@ -74,6 +75,7 @@ export interface Road {
   direction: RoadDirection;
   label?: string;
   color?: string;
+  controlPoint?: { x: number; y: number };
   paperIds: string[];
   gapIds: string[];
 }

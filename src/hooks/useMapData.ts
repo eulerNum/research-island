@@ -238,6 +238,7 @@ export function useMapData() {
     [refresh],
   );
 
+  /** Remove paper from bridge, and delete globally if no longer referenced anywhere */
   const removePaperFromBridge = useCallback(
     (paperId: string, bridgeId: string) => {
       const map = mapService.getFullMap();
@@ -245,12 +246,22 @@ export function useMapData() {
       if (bridge) {
         bridge.paperIds = bridge.paperIds.filter((id) => id !== paperId);
         mapService.updateBridge(bridge);
-        refresh();
       }
+      // Check if paper is still referenced anywhere
+      const freshMap = mapService.getFullMap();
+      const stillUsed =
+        freshMap.bridges.some((b) => b.paperIds.includes(paperId)) ||
+        freshMap.roads.some((r) => r.paperIds.includes(paperId)) ||
+        freshMap.islands.some((isl) => isl.cities.some((c) => c.paperIds.includes(paperId)));
+      if (!stillUsed) {
+        mapService.deletePaper(paperId);
+      }
+      refresh();
     },
     [refresh],
   );
 
+  /** Remove paper from road, and delete globally if no longer referenced anywhere */
   const removePaperFromRoad = useCallback(
     (paperId: string, roadId: string) => {
       const map = mapService.getFullMap();
@@ -258,8 +269,16 @@ export function useMapData() {
       if (road) {
         road.paperIds = road.paperIds.filter((id) => id !== paperId);
         mapService.updateRoad(road);
-        refresh();
       }
+      const freshMap = mapService.getFullMap();
+      const stillUsed =
+        freshMap.bridges.some((b) => b.paperIds.includes(paperId)) ||
+        freshMap.roads.some((r) => r.paperIds.includes(paperId)) ||
+        freshMap.islands.some((isl) => isl.cities.some((c) => c.paperIds.includes(paperId)));
+      if (!stillUsed) {
+        mapService.deletePaper(paperId);
+      }
+      refresh();
     },
     [refresh],
   );
