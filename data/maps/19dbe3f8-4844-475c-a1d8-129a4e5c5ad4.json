@@ -14,8 +14,8 @@
       "id": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
       "name": "Flavors",
       "position": {
-        "x": 391.4024658203125,
-        "y": 568.9044799804688
+        "x": 407.4024658203125,
+        "y": 569.9044799804688
       },
       "cities": [],
       "color": "#a8dadc"
@@ -83,8 +83,18 @@
           "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
           "name": "Texture",
           "position": {
-            "x": 976,
-            "y": 584
+            "x": 819,
+            "y": 613
+          },
+          "paperIds": []
+        },
+        {
+          "id": "b8c57043-2e4c-4c26-9a51-23c2051e657f",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Pattern",
+          "position": {
+            "x": 1057,
+            "y": 684
           },
           "paperIds": []
         }
