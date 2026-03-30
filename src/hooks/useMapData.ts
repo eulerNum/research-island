@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type {
   ResearchMap,
   Island,
@@ -14,12 +14,47 @@ import * as mapService from '../services/mapService';
 import * as githubService from '../services/githubService';
 import { generateId } from '../utils/idGenerator';
 
-export function useMapData() {
+export function useMapData(mapId?: string) {
+  // Set active map ID in mapService before loading
+  const effectiveMapId = mapId ?? null;
+  mapService.setActiveMapId(effectiveMapId);
+
   const [mapData, setMapData] = useState<ResearchMap>(mapService.getFullMap);
 
   const refresh = useCallback(() => {
     setMapData(mapService.getFullMap());
   }, []);
+
+  const [syncing, setSyncing] = useState(false);
+  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dataVersionRef = useRef(0); // tracks mutations for auto-save
+
+  // Auto-load from GitHub when mapId changes
+  useEffect(() => {
+    mapService.setActiveMapId(effectiveMapId);
+    const config = githubService.getGitHubConfig();
+    if (config && effectiveMapId) {
+      setSyncing(true);
+      githubService.loadFromGitHub(config, effectiveMapId)
+        .then((map) => {
+          mapService.importMap(map);
+          refresh();
+          setLastSyncError(null);
+        })
+        .catch((e) => {
+          // 404 = new map with no data yet, that's fine
+          if (!(e as Error).message.includes('404')) {
+            setLastSyncError((e as Error).message);
+          }
+          refresh(); // still load from localStorage
+        })
+        .finally(() => setSyncing(false));
+    } else {
+      refresh();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveMapId]);
 
   // ─── Islands ────────────────────────────────────────────
 
@@ -340,16 +375,70 @@ export function useMapData() {
   const saveToGitHub = useCallback(async () => {
     const config = githubService.getGitHubConfig();
     if (!config) throw new Error('GitHub 설정이 없습니다.');
-    await githubService.saveToGitHub(config, mapData);
-  }, [mapData]);
+    await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined);
+  }, [mapData, effectiveMapId]);
 
   const loadFromGitHub = useCallback(async () => {
     const config = githubService.getGitHubConfig();
     if (!config) throw new Error('GitHub 설정이 없습니다.');
-    const map = await githubService.loadFromGitHub(config);
+    const map = await githubService.loadFromGitHub(config, effectiveMapId ?? undefined);
     mapService.importMap(map);
     refresh();
-  }, [refresh]);
+  }, [refresh, effectiveMapId]);
+
+  // Auto-save to GitHub (30s debounce after any data mutation)
+  const scheduleAutoSave = useCallback(() => {
+    if (!effectiveMapId) return;
+    const config = githubService.getGitHubConfig();
+    if (!config) return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        const data = mapService.getFullMap();
+        await githubService.saveToGitHub(config, data, effectiveMapId);
+        setLastSyncError(null);
+      } catch (e) {
+        setLastSyncError((e as Error).message);
+      }
+    }, 30_000);
+  }, [effectiveMapId]);
+
+  // Trigger auto-save when mapData changes (skip initial load)
+  const isInitialLoad = useRef(true);
+  useEffect(() => {
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+    dataVersionRef.current++;
+    scheduleAutoSave();
+  }, [mapData, scheduleAutoSave]);
+
+  // Save immediately when leaving the page
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (!effectiveMapId) return;
+      // Save to localStorage as fallback so data isn't lost
+      const data = mapService.getFullMap();
+      localStorage.setItem(`pending-save-${effectiveMapId}`, JSON.stringify(data));
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Flush pending auto-save on unmount (navigating away)
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
+      if (effectiveMapId) {
+        const config = githubService.getGitHubConfig();
+        if (config) {
+          const data = mapService.getFullMap();
+          githubService.saveToGitHub(config, data, effectiveMapId).catch(() => {});
+        }
+      }
+    };
+  }, [effectiveMapId]);
 
   // ─── Undo / Redo ────────────────────────────────────────
 
@@ -381,6 +470,8 @@ export function useMapData() {
   return useMemo(
     () => ({
       mapData,
+      syncing,
+      lastSyncError,
       refresh,
       undo: handleUndo,
       redo: handleRedo,
@@ -414,7 +505,7 @@ export function useMapData() {
       loadFromGitHub,
     }),
     [
-      mapData, refresh, handleUndo, handleRedo,
+      mapData, syncing, lastSyncError, refresh, handleUndo, handleRedo,
       addIsland, updateIsland, saveIslandPosition, deleteIsland,
       addCity, updateCity, saveCityPosition, deleteCity,
       addBridge, updateBridge, deleteBridge,

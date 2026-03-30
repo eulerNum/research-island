@@ -66,7 +66,7 @@ export default function OverviewPage() {
           toolbar.resetConnection();
         }
       } else {
-        navigate(`/island/${islandId}`);
+        navigate(`island/${islandId}`);
       }
     },
     [toolbar, ctx, navigate],
@@ -132,7 +132,7 @@ export default function OverviewPage() {
   }, []);
 
   const handleNavigateToRoad = useCallback((roadId: string, islandId: string) => {
-    navigate(`/island/${islandId}?road=${roadId}`);
+    navigate(`island/${islandId}?road=${roadId}`);
   }, [navigate]);
 
   const handleContextMenu = useCallback((event: MapContextMenuEvent) => {

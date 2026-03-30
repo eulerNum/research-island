@@ -8,16 +8,44 @@ import type {
   ResearchGap,
 } from './types';
 
-const STORAGE_KEY = 'research-island-map';
+const LEGACY_STORAGE_KEY = 'research-island-map';
 const MAX_UNDO = 50;
 
+let activeMapId: string | null = null;
 let cache: ResearchMap | null = null;
 const undoStack: string[] = [];
 const redoStack: string[] = [];
 
+function storageKey(): string {
+  return activeMapId ? `research-map-${activeMapId}` : LEGACY_STORAGE_KEY;
+}
+
+/** Set the active map ID. Clears cache and undo stacks. */
+export function setActiveMapId(mapId: string | null): void {
+  if (mapId === activeMapId) return;
+  activeMapId = mapId;
+  cache = null;
+  undoStack.length = 0;
+  redoStack.length = 0;
+}
+
+export function getActiveMapId(): string | null {
+  return activeMapId;
+}
+
+/** Check if legacy (single-map) data exists in localStorage */
+export function hasLegacyData(): boolean {
+  return localStorage.getItem(LEGACY_STORAGE_KEY) !== null;
+}
+
+/** Remove legacy data after migration */
+export function removeLegacyData(): void {
+  localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
 function loadMap(): ResearchMap {
   if (cache) return cache;
-  const raw = localStorage.getItem(STORAGE_KEY);
+  const raw = localStorage.getItem(storageKey());
   if (raw) {
     cache = JSON.parse(raw) as ResearchMap;
     return cache;
@@ -28,7 +56,7 @@ function loadMap(): ResearchMap {
 
 function saveMap(map: ResearchMap): void {
   cache = map;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  localStorage.setItem(storageKey(), JSON.stringify(map));
 }
 
 /** Push current state to undo stack before a mutation */
@@ -356,7 +384,7 @@ export function getFullMap(): ResearchMap {
   if (cleaned) {
     // Persist the cleanup to cache + localStorage
     cache = structuredClone(map);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cache));
+    localStorage.setItem(storageKey(), JSON.stringify(cache));
   }
   return map;
 }

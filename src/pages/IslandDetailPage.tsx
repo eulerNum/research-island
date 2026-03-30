@@ -127,7 +127,7 @@ export default function IslandDetailPage() {
   }, [ctx.mapData.islands]);
 
   const handleNavigateToBridge = useCallback((bridgeId: string) => {
-    navigate(`/?bridge=${bridgeId}`);
+    navigate(`../?bridge=${bridgeId}`);
   }, [navigate]);
 
   const handleNavigateToRoad = useCallback((roadId: string, islandId: string) => {
@@ -135,7 +135,7 @@ export default function IslandDetailPage() {
       setSelectedRoadId(roadId);
       setHighlightedPaperId(null);
     } else {
-      navigate(`/island/${islandId}?road=${roadId}`);
+      navigate(`../island/${islandId}?road=${roadId}`);
     }
   }, [id, navigate]);
 
@@ -216,7 +216,7 @@ export default function IslandDetailPage() {
     setContextMenu({ x: event.screenX, y: event.screenY, items });
   }, [ctx, island?.cities, id, selectedRoadId]);
 
-  if (!island) return <Navigate to="/" replace />;
+  if (!island) return <Navigate to=".." replace />;
 
   const selectedRoad = selectedRoadId
     ? ctx.mapData.roads.find((r) => r.id === selectedRoadId)
@@ -234,7 +234,7 @@ export default function IslandDetailPage() {
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <div style={{ flex: 1, position: 'relative' }}>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('..')}
             style={{
               position: 'absolute',
               top: 12,

@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import type { ResearchMap } from '../services/types';
 import { useMapDataContext } from '../contexts/MapDataContext';
 import GitHubSettings from './GitHubSettings';
@@ -17,6 +17,8 @@ interface SidebarProps {
 
 export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: SidebarProps) {
   const navigate = useNavigate();
+  const { mapId } = useParams<{ mapId: string }>();
+  const basePath = mapId ? `/map/${mapId}` : '';
   const ctx = useMapDataContext();
   const [showGitHubSettings, setShowGitHubSettings] = useState(false);
   const [showSheetsSettings, setShowSheetsSettings] = useState(false);
@@ -143,9 +145,25 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
         flexShrink: 0,
       }}
     >
-      <h2 style={{ fontSize: '1rem', marginBottom: '12px', color: 'var(--text-heading)' }}>
-        Research Island Map
-      </h2>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+        <button
+          onClick={() => navigate('/')}
+          title="홈으로"
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            color: 'var(--text-muted)',
+            padding: 0,
+          }}
+        >
+          &larr;
+        </button>
+        <h2 style={{ fontSize: '1rem', margin: 0, color: 'var(--text-heading)' }}>
+          Research Island Map
+        </h2>
+      </div>
 
       <section>
         <h3 style={sectionTitle}>Islands ({data.islands.length})</h3>
@@ -176,7 +194,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
                   <span
                     style={{ width: 10, height: 10, borderRadius: '50%', background: island.color ?? '#8ecae6', flexShrink: 0 }}
                   />
-                  <span onClick={() => navigate(`/island/${island.id}`)} style={{ flex: 1 }}>
+                  <span onClick={() => navigate(`${basePath}/island/${island.id}`)} style={{ flex: 1 }}>
                     {island.name}
                   </span>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{island.cities.length}</span>
@@ -186,7 +204,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
                     {island.cities.map((city) => (
                       <li
                         key={city.id}
-                        onClick={() => navigate(`/island/${island.id}`)}
+                        onClick={() => navigate(`${basePath}/island/${island.id}`)}
                         style={{
                           padding: '3px 8px 3px 36px',
                           cursor: 'pointer',
@@ -222,7 +240,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
               return (
                 <li
                   key={bridge.id}
-                  onClick={() => navigate(`/?bridge=${bridge.id}`)}
+                  onClick={() => navigate(`${basePath}?bridge=${bridge.id}`)}
                   style={{
                     padding: '3px 8px',
                     fontSize: '0.8rem',
