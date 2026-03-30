@@ -29,22 +29,62 @@
       },
       "cities": [
         {
-          "id": "a58ca88e-8e3f-4274-854d-64d52c36e7c9",
-          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
-          "name": "Color",
-          "position": {
-            "x": 765,
-            "y": 288
-          },
-          "paperIds": []
-        },
-        {
           "id": "f0713606-bfa8-416f-879b-e531a32bb01d",
           "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
           "name": "Saturation",
           "position": {
-            "x": 844,
-            "y": 396
+            "x": 803,
+            "y": 424
+          },
+          "paperIds": []
+        },
+        {
+          "id": "eb64729d-e296-450b-ae8a-23bfe7531276",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Value",
+          "position": {
+            "x": 875,
+            "y": 293
+          },
+          "paperIds": []
+        },
+        {
+          "id": "bccae9d0-af40-4660-80e9-9ea7de9dd1d9",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Hue",
+          "position": {
+            "x": 709,
+            "y": 304
+          },
+          "paperIds": []
+        },
+        {
+          "id": "95987cf3-e8bb-4070-984d-d7ca60cf07fb",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Shapes",
+          "position": {
+            "x": 1236,
+            "y": 384
+          },
+          "paperIds": []
+        },
+        {
+          "id": "1b6e4790-cfde-4ef9-8fa6-cc414954202f",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Curvature",
+          "position": {
+            "x": 1301,
+            "y": 473
+          },
+          "paperIds": []
+        },
+        {
+          "id": "71e715b9-f126-4880-9491-4d9f8fcf1e50",
+          "islandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
+          "name": "Texture",
+          "position": {
+            "x": 976,
+            "y": 584
           },
           "paperIds": []
         }
