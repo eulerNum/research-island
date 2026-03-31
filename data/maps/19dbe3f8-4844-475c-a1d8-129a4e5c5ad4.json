@@ -207,7 +207,8 @@
       "direction": "forward",
       "label": "AI",
       "paperIds": [
-        "cb18e2e3-39de-43cd-afc9-d495730eac92"
+        "cb18e2e3-39de-43cd-afc9-d495730eac92",
+        "770bfc6b-3183-495c-b392-b559c1a31f7b"
       ],
       "gapIds": [],
       "controlPoint": {
@@ -354,7 +355,9 @@
       "targetIslandId": "a20fa33c-8f7f-42eb-84ef-0d27e0575fff",
       "direction": "forward",
       "label": "Sensory",
-      "paperIds": [],
+      "paperIds": [
+        "770bfc6b-3183-495c-b392-b559c1a31f7b"
+      ],
       "gapIds": [],
       "controlPoint": {
         "x": 595,
@@ -405,9 +408,17 @@
       "id": "f14d1696-0721-4058-b379-cc6cea979810",
       "title": "오뚜기 1년차",
       "authors": [],
-      "year": 2026,
+      "year": 2025,
       "source": "manual",
       "createdAt": "2026-03-31T10:14:22.853Z"
+    },
+    {
+      "id": "770bfc6b-3183-495c-b392-b559c1a31f7b",
+      "title": "오뚜기 2년차",
+      "authors": [],
+      "year": 2026,
+      "source": "manual",
+      "createdAt": "2026-03-31T10:16:12.457Z"
     }
   ],
   "gaps": []
