@@ -166,7 +166,9 @@
       "paperIds": [
         "f14d1696-0721-4058-b379-cc6cea979810"
       ],
-      "gapIds": [],
+      "gapIds": [
+        "b50f7537-a9f1-4be4-98d9-0b54aa77e8c7"
+      ],
       "color": "#ef4444",
       "controlPoint": {
         "x": 404.102783203125,
@@ -346,8 +348,8 @@
       ],
       "gapIds": [],
       "controlPoint": {
-        "x": 528.15625,
-        "y": 953.0420532226562
+        "x": 572.52783203125,
+        "y": 923.0947875976562
       },
       "color": "#a855f7"
     },
@@ -430,6 +432,13 @@
       "source": "manual",
       "relatedPaperIds": [],
       "createdAt": "2026-03-31T10:18:28.561Z"
+    },
+    {
+      "id": "b50f7537-a9f1-4be4-98d9-0b54aa77e8c7",
+      "description": "samplde->flavors, flavors-> visual elements를 이용한 수학공식",
+      "source": "manual",
+      "relatedPaperIds": [],
+      "createdAt": "2026-03-31T10:19:36.144Z"
     }
   ]
 }
