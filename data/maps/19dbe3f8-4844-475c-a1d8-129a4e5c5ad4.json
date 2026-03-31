@@ -24,8 +24,8 @@
       "id": "b8695f80-066b-4864-b740-795c5f03a1b9",
       "name": "Visual Elements",
       "position": {
-        "x": 704,
-        "y": 441
+        "x": 679.65087890625,
+        "y": 440.7027282714844
       },
       "cities": [
         {
@@ -181,7 +181,9 @@
       "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
       "direction": "forward",
       "label": "Human",
-      "paperIds": [],
+      "paperIds": [
+        "770bfc6b-3183-495c-b392-b559c1a31f7b"
+      ],
       "gapIds": [],
       "controlPoint": {
         "x": 915.924560546875,
@@ -194,7 +196,9 @@
       "targetIslandId": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
       "direction": "forward",
       "label": "Hybrid",
-      "paperIds": [],
+      "paperIds": [
+        "770bfc6b-3183-495c-b392-b559c1a31f7b"
+      ],
       "gapIds": [],
       "controlPoint": {
         "x": 921.5,
