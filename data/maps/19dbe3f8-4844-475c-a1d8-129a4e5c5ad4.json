@@ -224,7 +224,9 @@
       "direction": "forward",
       "label": "Generic",
       "paperIds": [],
-      "gapIds": [],
+      "gapIds": [
+        "5bcb0af7-6242-496f-ba1c-b16f12c908c4"
+      ],
       "controlPoint": {
         "x": 543.8659057617188,
         "y": 460.8281555175781
@@ -421,5 +423,13 @@
       "createdAt": "2026-03-31T10:16:12.457Z"
     }
   ],
-  "gaps": []
+  "gaps": [
+    {
+      "id": "5bcb0af7-6242-496f-ba1c-b16f12c908c4",
+      "description": "기본맛 이외의 향미들 모두에 대한 일반적 연상",
+      "source": "manual",
+      "relatedPaperIds": [],
+      "createdAt": "2026-03-31T10:18:28.561Z"
+    }
+  ]
 }
