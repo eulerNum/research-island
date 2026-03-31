@@ -130,13 +130,14 @@
       "direction": "forward",
       "label": "Sensory",
       "paperIds": [
-        "cb18e2e3-39de-43cd-afc9-d495730eac92"
+        "cb18e2e3-39de-43cd-afc9-d495730eac92",
+        "f14d1696-0721-4058-b379-cc6cea979810"
       ],
       "gapIds": [],
       "color": "#ef4444",
       "controlPoint": {
-        "x": 275.50872802734375,
-        "y": 495.5049133300781
+        "x": 257.3795166015625,
+        "y": 467.3446350097656
       }
     },
     {
@@ -146,7 +147,8 @@
       "direction": "forward",
       "label": "Sensory",
       "paperIds": [
-        "cb18e2e3-39de-43cd-afc9-d495730eac92"
+        "cb18e2e3-39de-43cd-afc9-d495730eac92",
+        "f14d1696-0721-4058-b379-cc6cea979810"
       ],
       "gapIds": [],
       "color": "#ef4444",
@@ -161,7 +163,9 @@
       "targetIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
       "direction": "forward",
       "label": "Specific",
-      "paperIds": [],
+      "paperIds": [
+        "f14d1696-0721-4058-b379-cc6cea979810"
+      ],
       "gapIds": [],
       "color": "#ef4444",
       "controlPoint": {
@@ -265,8 +269,8 @@
       ],
       "gapIds": [],
       "controlPoint": {
-        "x": 223.50872802734375,
-        "y": 545.5049133300781
+        "x": 259.3795166015625,
+        "y": 545.3446350097656
       },
       "color": "#a855f7"
     },
@@ -396,6 +400,14 @@
       "url": "https://arxiv.org/abs/2602.04159",
       "source": "manual",
       "createdAt": "2026-03-31T09:21:25.662Z"
+    },
+    {
+      "id": "f14d1696-0721-4058-b379-cc6cea979810",
+      "title": "오뚜기 1년차",
+      "authors": [],
+      "year": 2026,
+      "source": "manual",
+      "createdAt": "2026-03-31T10:14:22.853Z"
     }
   ],
   "gaps": []
