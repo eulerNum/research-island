@@ -366,6 +366,9 @@
       "title": "sss",
       "authors": [],
       "year": 2026,
+      "figureUrls": [
+        "https://raw.githubusercontent.com/eulerNum/research-island/main/data/figures/a20c9bc9-96d3-4130-8a0b-64314592e4dd_0.png"
+      ],
       "source": "manual",
       "createdAt": "2026-03-31T02:58:34.905Z"
     }
