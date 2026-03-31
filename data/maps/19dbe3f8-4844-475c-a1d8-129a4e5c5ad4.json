@@ -14,8 +14,8 @@
       "id": "b253aaf2-0c16-42d8-8bad-eaa77788565e",
       "name": "Flavors",
       "position": {
-        "x": 392.4024658203125,
-        "y": 520.9044799804688
+        "x": 377.4024658203125,
+        "y": 542.9044799804688
       },
       "cities": [],
       "color": "#a8dadc"
@@ -25,7 +25,7 @@
       "name": "Visual Elements",
       "position": {
         "x": 704,
-        "y": 430
+        "y": 441
       },
       "cities": [
         {
@@ -105,8 +105,8 @@
       "id": "9d96409a-e0bf-4207-b25b-b2b8f635efa4",
       "name": "Images",
       "position": {
-        "x": 1081.9443359375,
-        "y": 425.8104248046875
+        "x": 1061.9443359375,
+        "y": 437.8104248046875
       },
       "cities": [],
       "color": "#ffd166"
@@ -143,9 +143,7 @@
       "targetIslandId": "9fbaa63d-e4ba-4dff-8b50-d5fa917964e2",
       "direction": "forward",
       "label": "Sensory",
-      "paperIds": [
-        "a20c9bc9-96d3-4130-8a0b-64314592e4dd"
-      ],
+      "paperIds": [],
       "gapIds": [],
       "color": "#ef4444",
       "controlPoint": {
@@ -159,9 +157,7 @@
       "targetIslandId": "b8695f80-066b-4864-b740-795c5f03a1b9",
       "direction": "forward",
       "label": "Sensory",
-      "paperIds": [
-        "a20c9bc9-96d3-4130-8a0b-64314592e4dd"
-      ],
+      "paperIds": [],
       "gapIds": [],
       "color": "#ef4444",
       "controlPoint": {
@@ -329,8 +325,8 @@
       "paperIds": [],
       "gapIds": [],
       "controlPoint": {
-        "x": 413.47265625,
-        "y": 986.7749633789062
+        "x": 486.52783203125,
+        "y": 977.0947875976562
       },
       "color": "#a855f7"
     },
@@ -360,18 +356,6 @@
       "gapIds": []
     }
   ],
-  "papers": [
-    {
-      "id": "a20c9bc9-96d3-4130-8a0b-64314592e4dd",
-      "title": "sss",
-      "authors": [],
-      "year": 2026,
-      "figureUrls": [
-        "https://raw.githubusercontent.com/eulerNum/research-island/main/data/figures/a20c9bc9-96d3-4130-8a0b-64314592e4dd_0.png"
-      ],
-      "source": "manual",
-      "createdAt": "2026-03-31T02:58:34.905Z"
-    }
-  ],
+  "papers": [],
   "gaps": []
 }
