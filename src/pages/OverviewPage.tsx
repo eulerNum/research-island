@@ -252,6 +252,7 @@ export default function OverviewPage() {
             onCanvasClick={handleCanvasClick}
             onIslandDragEnd={handleIslandDragEnd}
             onContextMenu={handleContextMenu}
+            onPaperDropOnBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
           />
         </main>
         {selectedBridge && (

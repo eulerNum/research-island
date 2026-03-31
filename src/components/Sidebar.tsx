@@ -286,6 +286,11 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
           {filteredPapers.map((paper) => (
             <li
               key={paper.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('application/paper-id', paper.id);
+                e.dataTransfer.effectAllowed = 'copy';
+              }}
               onClick={() => onHighlightPaper?.(highlightedPaperId === paper.id ? null : paper.id)}
               style={{
                 padding: '3px 6px',
@@ -293,7 +298,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
                 color: highlightedPaperId === paper.id ? 'var(--text-heading)' : 'var(--text-secondary)',
                 background: highlightedPaperId === paper.id ? 'var(--bg-hover)' : 'transparent',
                 borderRadius: 4,
-                cursor: onHighlightPaper ? 'pointer' : 'default',
+                cursor: onHighlightPaper ? 'grab' : 'default',
                 fontWeight: highlightedPaperId === paper.id ? 600 : 400,
                 transition: 'all 0.15s',
                 display: 'flex',

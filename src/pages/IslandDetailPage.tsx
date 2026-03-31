@@ -279,6 +279,7 @@ export default function IslandDetailPage() {
             onCanvasClick={handleCanvasClick}
             onCityDragEnd={handleCityDragEnd}
             onContextMenu={handleContextMenu}
+            onPaperDropOnRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
           />
         </div>
         {selectedRoad && (

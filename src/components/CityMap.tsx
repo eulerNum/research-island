@@ -22,6 +22,7 @@ interface CityMapProps {
   onCanvasClick: (position: { x: number; y: number }) => void;
   onCityDragEnd: (cityId: string, position: { x: number; y: number }) => void;
   onContextMenu?: (event: CityMapContextMenuEvent) => void;
+  onPaperDropOnRoad?: (paperId: string, roadId: string) => void;
 }
 
 const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
@@ -35,6 +36,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
   onCanvasClick,
   onCityDragEnd,
   onContextMenu,
+  onPaperDropOnRoad,
 }, ref) {
   const svgRef = useRef<SVGSVGElement>(null);
   useImperativeHandle(ref, () => svgRef.current!, []);
@@ -45,6 +47,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
   const onCanvasClickRef = useRef(onCanvasClick);
   const onCityDragEndRef = useRef(onCityDragEnd);
   const onContextMenuRef = useRef(onContextMenu);
+  const onPaperDropOnRoadRef = useRef(onPaperDropOnRoad);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -53,6 +56,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
     onCanvasClickRef.current = onCanvasClick;
     onCityDragEndRef.current = onCityDragEnd;
     onContextMenuRef.current = onContextMenu;
+    onPaperDropOnRoadRef.current = onPaperDropOnRoad;
   });
 
   useEffect(() => {
@@ -210,6 +214,29 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
         _event.stopPropagation();
         onContextMenuRef.current?.({ type: 'road', id: d.id, screenX: _event.clientX, screenY: _event.clientY });
       });
+
+    // Native DOM drag-over/drop for paper drag from sidebar
+    roadGroups.each(function (d) {
+      const el = this as SVGGElement;
+      el.addEventListener('dragover', (e) => {
+        if (e.dataTransfer?.types.includes('application/paper-id')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          d3.select(el).select('.road').attr('stroke-width', 5).attr('filter', 'url(#road-glow)');
+        }
+      });
+      el.addEventListener('dragleave', () => {
+        d3.select(el).select('.road').attr('stroke-width', 2.5).attr('filter', null);
+      });
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const paperId = e.dataTransfer?.getData('application/paper-id');
+        if (paperId) {
+          onPaperDropOnRoadRef.current?.(paperId, d.id);
+        }
+        d3.select(el).select('.road').attr('stroke-width', 2.5).attr('filter', null);
+      });
+    });
 
     roadGroups
       .append('path')

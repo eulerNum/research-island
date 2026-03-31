@@ -21,6 +21,7 @@ interface IslandMapProps {
   onCanvasClick: (position: { x: number; y: number }) => void;
   onIslandDragEnd: (islandId: string, position: { x: number; y: number }) => void;
   onContextMenu?: (event: MapContextMenuEvent) => void;
+  onPaperDropOnBridge?: (paperId: string, bridgeId: string) => void;
 }
 
 interface SimNode extends d3.SimulationNodeDatum {
@@ -37,6 +38,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
   onCanvasClick,
   onIslandDragEnd,
   onContextMenu,
+  onPaperDropOnBridge,
 }, ref) {
   const svgRef = useRef<SVGSVGElement>(null);
   useImperativeHandle(ref, () => svgRef.current!, []);
@@ -50,6 +52,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
   const onIslandDragEndRef = useRef(onIslandDragEnd);
   const connectionStartRef = useRef(connectionStart);
   const onContextMenuRef = useRef(onContextMenu);
+  const onPaperDropOnBridgeRef = useRef(onPaperDropOnBridge);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -59,6 +62,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
     onIslandDragEndRef.current = onIslandDragEnd;
     connectionStartRef.current = connectionStart;
     onContextMenuRef.current = onContextMenu;
+    onPaperDropOnBridgeRef.current = onPaperDropOnBridge;
   });
 
   useEffect(() => {
@@ -177,6 +181,29 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
         _event.stopPropagation();
         onContextMenuRef.current?.({ type: 'bridge', id: d.id, screenX: _event.clientX, screenY: _event.clientY });
       });
+
+    // Native DOM drag-over/drop for paper drag from sidebar
+    bridgeGroups.each(function (d) {
+      const el = this as SVGGElement;
+      el.addEventListener('dragover', (e) => {
+        if (e.dataTransfer?.types.includes('application/paper-id')) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'copy';
+          d3.select(el).select('.bridge').attr('stroke-width', 6).attr('filter', 'url(#glow)');
+        }
+      });
+      el.addEventListener('dragleave', () => {
+        d3.select(el).select('.bridge').attr('stroke-width', 3).attr('filter', null);
+      });
+      el.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const paperId = e.dataTransfer?.getData('application/paper-id');
+        if (paperId) {
+          onPaperDropOnBridgeRef.current?.(paperId, d.id);
+        }
+        d3.select(el).select('.bridge').attr('stroke-width', 3).attr('filter', null);
+      });
+    });
 
     // Invisible wide hit area for easy clicking
     const bridgeHitAreas = bridgeGroups
