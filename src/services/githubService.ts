@@ -40,7 +40,12 @@ async function getFileSha(
 ): Promise<string | null> {
   const res = await fetch(
     `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}`,
-    { headers: { Authorization: `Bearer ${config.token}` }, cache: 'no-store' },
+    {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'If-None-Match': '',  // bypass browser cache
+      },
+    },
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
@@ -79,7 +84,13 @@ export async function saveToGitHub(
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
   const jsonStr = JSON.stringify(map, null, 2);
   const content = utf8ToBase64(jsonStr);
-  const remoteSha = await getFileSha(config, filePath);
+
+  let remoteSha: string | null;
+  try {
+    remoteSha = await getFileSha(config, filePath);
+  } catch {
+    throw new Error('GitHub 연결 실패 — 네트워크를 확인하세요.');
+  }
 
   // Conflict detection: if remote SHA differs from our last-known SHA,
   // another device has saved since we last loaded/saved.
@@ -90,26 +101,33 @@ export async function saveToGitHub(
     }
   }
 
+  // When force-saving, always use the latest remote SHA
   const body: Record<string, string> = {
     message: `Update map ${mapId ?? 'legacy'}`,
     content,
   };
   if (remoteSha) body.sha = remoteSha;
 
-  const res = await fetch(
-    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
-    {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
       },
-      body: JSON.stringify(body),
-    },
-  );
-  const result = await res.json();
+    );
+  } catch {
+    throw new Error('GitHub 저장 실패 — 네트워크를 확인하세요.');
+  }
+
+  const result = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(result.message || `GitHub save failed: ${res.status}`);
+    throw new Error(result?.message || `GitHub save failed: ${res.status}`);
   }
 
   // Update known SHA after successful save
@@ -123,10 +141,20 @@ export async function loadFromGitHub(
   mapId?: string,
 ): Promise<ResearchMap> {
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
-  const res = await fetch(
-    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${config.token}` }, cache: 'no-store' },
-  );
+  let res: Response;
+  try {
+    res = await fetch(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
+      {
+        headers: {
+          Authorization: `Bearer ${config.token}`,
+          'If-None-Match': '',  // bypass browser cache
+        },
+      },
+    );
+  } catch {
+    throw new Error('GitHub 로드 실패 — 네트워크를 확인하세요.');
+  }
   if (!res.ok) throw new Error(`GitHub load failed: ${res.status}`);
   const data = await res.json();
 
@@ -167,7 +195,6 @@ export async function deleteFromGitHub(
     `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
     {
       method: 'DELETE',
-      cache: 'no-store',
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json',
