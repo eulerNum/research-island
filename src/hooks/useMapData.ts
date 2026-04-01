@@ -12,6 +12,7 @@ import type {
 } from '../services/types';
 import * as mapService from '../services/mapService';
 import * as githubService from '../services/githubService';
+import { ConflictError } from '../services/githubService';
 import { generateId } from '../utils/idGenerator';
 
 export function useMapData(mapId?: string) {
@@ -375,7 +376,24 @@ export function useMapData(mapId?: string) {
   const saveToGitHub = useCallback(async () => {
     const config = githubService.getGitHubConfig();
     if (!config) throw new Error('GitHub 설정이 없습니다.');
-    await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined);
+    try {
+      await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined);
+    } catch (e) {
+      if (e instanceof ConflictError) {
+        const force = confirm(
+          '다른 기기에서 변경된 데이터가 있습니다.\n\n' +
+          '• 확인 → 현재 내 데이터로 덮어쓰기\n' +
+          '• 취소 → 저장 중단 (Load로 최신 데이터를 먼저 가져오세요)',
+        );
+        if (force) {
+          await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined, true);
+        } else {
+          throw e;
+        }
+      } else {
+        throw e;
+      }
+    }
   }, [mapData, effectiveMapId]);
 
   const loadFromGitHub = useCallback(async () => {
@@ -400,7 +418,12 @@ export function useMapData(mapId?: string) {
       await githubService.saveToGitHub(config, data, effectiveMapId);
       setLastSyncError(null);
     } catch (e) {
-      setLastSyncError((e as Error).message);
+      if (e instanceof ConflictError) {
+        // Don't overwrite — alert user to load first
+        setLastSyncError(e.message);
+      } else {
+        setLastSyncError((e as Error).message);
+      }
     }
   }, [effectiveMapId]);
 
@@ -426,11 +449,31 @@ export function useMapData(mapId?: string) {
     scheduleAutoSave();
   }, [mapData, scheduleAutoSave]);
 
-  // Save when tab becomes hidden (more reliable than beforeunload on mobile)
+  // Sync when tab visibility changes:
+  //   hidden  → flush save to GitHub
+  //   visible → reload from GitHub to pick up changes from other devices
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         flushSave();
+      } else if (document.visibilityState === 'visible') {
+        // Re-fetch from GitHub when returning to this tab
+        if (!effectiveMapId) return;
+        const config = githubService.getGitHubConfig();
+        if (!config) return;
+        setSyncing(true);
+        githubService.loadFromGitHub(config, effectiveMapId)
+          .then((map) => {
+            mapService.importMap(map);
+            refresh();
+            setLastSyncError(null);
+          })
+          .catch((e) => {
+            if (!(e as Error).message.includes('404')) {
+              setLastSyncError((e as Error).message);
+            }
+          })
+          .finally(() => setSyncing(false));
       }
     };
     const handleBeforeUnload = () => {

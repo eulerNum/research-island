@@ -3,6 +3,17 @@ import type { ResearchMap } from './types';
 const CONFIG_KEY = 'github-config';
 const LEGACY_FILE_PATH = 'data/research-map.json';
 
+// Track the SHA we last loaded/saved so we can detect remote changes
+const knownShaMap = new Map<string, string>();
+
+/** Custom error for conflict detection */
+export class ConflictError extends Error {
+  constructor() {
+    super('다른 기기에서 변경됨 — 먼저 Load한 후 다시 저장하세요.');
+    this.name = 'ConflictError';
+  }
+}
+
 function mapFilePath(mapId: string): string {
   return `data/maps/${mapId}.json`;
 }
@@ -29,7 +40,7 @@ async function getFileSha(
 ): Promise<string | null> {
   const res = await fetch(
     `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}`,
-    { headers: { Authorization: `Bearer ${config.token}` } },
+    { headers: { Authorization: `Bearer ${config.token}` }, cache: 'no-store' },
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
@@ -63,17 +74,27 @@ export async function saveToGitHub(
   config: GitHubConfig,
   map: ResearchMap,
   mapId?: string,
+  force?: boolean,
 ): Promise<void> {
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
   const jsonStr = JSON.stringify(map, null, 2);
   const content = utf8ToBase64(jsonStr);
-  const sha = await getFileSha(config, filePath);
+  const remoteSha = await getFileSha(config, filePath);
+
+  // Conflict detection: if remote SHA differs from our last-known SHA,
+  // another device has saved since we last loaded/saved.
+  if (!force && remoteSha) {
+    const knownSha = knownShaMap.get(filePath);
+    if (knownSha && knownSha !== remoteSha) {
+      throw new ConflictError();
+    }
+  }
 
   const body: Record<string, string> = {
     message: `Update map ${mapId ?? 'legacy'}`,
     content,
   };
-  if (sha) body.sha = sha;
+  if (remoteSha) body.sha = remoteSha;
 
   const res = await fetch(
     `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
@@ -86,9 +107,14 @@ export async function saveToGitHub(
       body: JSON.stringify(body),
     },
   );
+  const result = await res.json();
   if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.message || `GitHub save failed: ${res.status}`);
+    throw new Error(result.message || `GitHub save failed: ${res.status}`);
+  }
+
+  // Update known SHA after successful save
+  if (result?.content?.sha) {
+    knownShaMap.set(filePath, result.content.sha);
   }
 }
 
@@ -99,10 +125,15 @@ export async function loadFromGitHub(
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
   const res = await fetch(
     `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
-    { headers: { Authorization: `Bearer ${config.token}` } },
+    { headers: { Authorization: `Bearer ${config.token}` }, cache: 'no-store' },
   );
   if (!res.ok) throw new Error(`GitHub load failed: ${res.status}`);
   const data = await res.json();
+
+  // Track SHA so we can detect conflicts on next save
+  if (data.sha) {
+    knownShaMap.set(filePath, data.sha);
+  }
 
   // GitHub Contents API returns content: null for files > 1MB.
   // In that case, download via the raw download_url or git blob API.
@@ -136,6 +167,7 @@ export async function deleteFromGitHub(
     `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
     {
       method: 'DELETE',
+      cache: 'no-store',
       headers: {
         Authorization: `Bearer ${config.token}`,
         'Content-Type': 'application/json',

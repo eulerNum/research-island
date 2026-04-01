@@ -425,6 +425,37 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
 
       {/* GitHub sync */}
       <div style={{ paddingTop: 8, borderTop: '1px solid var(--border-secondary)' }}>
+        {ctx.lastSyncError && (
+          <div
+            style={{
+              padding: '6px 8px',
+              marginBottom: 8,
+              borderRadius: 4,
+              fontSize: '0.75rem',
+              background: '#fff3cd',
+              color: '#856404',
+              border: '1px solid #ffc107',
+            }}
+          >
+            {ctx.lastSyncError}
+            <button
+              onClick={handleLoad}
+              style={{
+                display: 'block',
+                marginTop: 4,
+                padding: '3px 8px',
+                border: '1px solid #856404',
+                borderRadius: 3,
+                background: 'transparent',
+                color: '#856404',
+                cursor: 'pointer',
+                fontSize: '0.7rem',
+              }}
+            >
+              Load로 최신 데이터 가져오기
+            </button>
+          </div>
+        )}
         {status && (
           <div
             style={{
