@@ -40,7 +40,7 @@ Interactive web app that visualizes food-science research as an island-bridge-ci
 **Core domain model** (`src/services/types.ts`):
 - `Island` = research field, contains `City[]` (sub-topics with linked papers)
 - `Bridge` = directed relationship between islands; `Road` = directed relationship between cities
-- `Paper` = academic paper with `journal`, `comment`, `figureUrls` fields
+- `Paper` = academic paper with `journal`, `comment`, `figureUrls`, `aiSummary` fields
 - `ResearchGap` = identified gap (`auto_detected` | `manual`)
 - `ResearchMap` = top-level container for the entire map state
 
@@ -75,10 +75,12 @@ src/
 │   ├── OverviewPage.tsx
 │   └── IslandDetailPage.tsx
 ├── components/         # UI components
-│   ├── IslandMap.tsx   # D3 island overview + bridge drop targets
+│   ├── IslandMap.tsx   # D3 island overview + bridge drop targets + island expand
 │   ├── CityMap.tsx     # D3 city detail view + road drop targets
-│   ├── Sidebar.tsx     # Left sidebar (tree nav + sync + draggable papers)
-│   ├── DetailPanel.tsx # Right panel (papers + gaps + cross-refs)
+│   ├── Sidebar.tsx     # Left sidebar (tree nav + paper grouping + draggable + hover tooltip)
+│   ├── DetailPanel.tsx # Right panel (bridge/road papers + gaps + cross-refs)
+│   ├── PaperStudyPanel.tsx # Wide paper study panel (AI summary, figures, notes)
+│   ├── GapPostitAnimation.tsx # Gap memo postit fly animation
 │   ├── Toolbar.tsx     # Top mode switcher + export
 │   ├── PaperForm.tsx   # Paper manual entry form + S2 search
 │   ├── GapMemo.tsx     # Research gap sticky notes
