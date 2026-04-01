@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type {
   ResearchMap,
   Island,
@@ -12,7 +12,6 @@ import type {
 } from '../services/types';
 import * as mapService from '../services/mapService';
 import * as githubService from '../services/githubService';
-import { ConflictError } from '../services/githubService';
 import { generateId } from '../utils/idGenerator';
 
 export function useMapData(mapId?: string) {
@@ -26,29 +25,19 @@ export function useMapData(mapId?: string) {
     setMapData(mapService.getFullMap());
   }, []);
 
-  const [syncing, setSyncing] = useState(false);
-  const [lastSyncError, setLastSyncError] = useState<string | null>(null);
-
-  // Auto-load from GitHub when mapId changes
+  // Auto-load from GitHub on mount (Google Drive model: open → latest data)
   useEffect(() => {
     mapService.setActiveMapId(effectiveMapId);
     const config = githubService.getGitHubConfig();
     if (config && effectiveMapId) {
-      setSyncing(true);
       githubService.loadFromGitHub(config, effectiveMapId)
         .then((map) => {
           mapService.importMap(map);
           refresh();
-          setLastSyncError(null);
         })
-        .catch((e) => {
-          // 404 = new map with no data yet, that's fine
-          if (!(e as Error).message.includes('404')) {
-            setLastSyncError((e as Error).message);
-          }
-          refresh(); // still load from localStorage
-        })
-        .finally(() => setSyncing(false));
+        .catch(() => {
+          refresh(); // fall back to localStorage
+        });
     } else {
       refresh();
     }
@@ -374,61 +363,8 @@ export function useMapData(mapId?: string) {
   const saveToGitHub = useCallback(async () => {
     const config = githubService.getGitHubConfig();
     if (!config) throw new Error('GitHub 설정이 없습니다.');
-    try {
-      await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined);
-    } catch (e) {
-      if (e instanceof ConflictError) {
-        const force = confirm(
-          '다른 기기에서 변경된 데이터가 있습니다.\n\n' +
-          '• 확인 → 현재 내 데이터로 덮어쓰기\n' +
-          '• 취소 → 저장 중단 (Load로 최신 데이터를 먼저 가져오세요)',
-        );
-        if (force) {
-          await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined, true);
-        } else {
-          throw e;
-        }
-      } else {
-        throw e;
-      }
-    }
+    await githubService.saveToGitHub(config, mapData, effectiveMapId ?? undefined);
   }, [mapData, effectiveMapId]);
-
-  const loadFromGitHub = useCallback(async () => {
-    const config = githubService.getGitHubConfig();
-    if (!config) throw new Error('GitHub 설정이 없습니다.');
-    const map = await githubService.loadFromGitHub(config, effectiveMapId ?? undefined);
-    mapService.importMap(map);
-    refresh();
-  }, [refresh, effectiveMapId]);
-
-  // Auto-load from GitHub when tab becomes visible (pick up changes from other devices)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (!effectiveMapId) return;
-        const config = githubService.getGitHubConfig();
-        if (!config) return;
-        setSyncing(true);
-        githubService.loadFromGitHub(config, effectiveMapId)
-          .then((map) => {
-            mapService.importMap(map);
-            refresh();
-            setLastSyncError(null);
-          })
-          .catch((e) => {
-            if (!(e as Error).message.includes('404')) {
-              setLastSyncError((e as Error).message);
-            }
-          })
-          .finally(() => setSyncing(false));
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [effectiveMapId, refresh]);
 
   // ─── Undo / Redo ────────────────────────────────────────
 
@@ -460,8 +396,6 @@ export function useMapData(mapId?: string) {
   return useMemo(
     () => ({
       mapData,
-      syncing,
-      lastSyncError,
       refresh,
       undo: handleUndo,
       redo: handleRedo,
@@ -492,10 +426,9 @@ export function useMapData(mapId?: string) {
       addGapToRoad,
       importMap,
       saveToGitHub,
-      loadFromGitHub,
     }),
     [
-      mapData, syncing, lastSyncError, refresh, handleUndo, handleRedo,
+      mapData, refresh, handleUndo, handleRedo,
       addIsland, updateIsland, saveIslandPosition, deleteIsland,
       addCity, updateCity, saveCityPosition, deleteCity,
       addBridge, updateBridge, deleteBridge,
@@ -503,7 +436,7 @@ export function useMapData(mapId?: string) {
       addPaper, updatePaper, deletePaper, addPaperToBridge, addPaperToRoad,
       removePaperFromBridge, removePaperFromRoad,
       addGap, deleteGap, addGapToBridge, addGapToRoad,
-      importMap, saveToGitHub, loadFromGitHub,
+      importMap, saveToGitHub,
     ],
   );
 }

@@ -147,22 +147,6 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
     }
   };
 
-  const handleLoad = async () => {
-    if (!getGitHubConfig()) {
-      setShowGitHubSettings(true);
-      return;
-    }
-    setLoading(true);
-    try {
-      await ctx.loadFromGitHub();
-      showStatus('success', 'Loaded!');
-    } catch (e) {
-      showStatus('error', (e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const isExpanded = !collapsed;
 
   return (
@@ -224,39 +208,8 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
         )}
       </div>
 
-      {/* Save/Load — 최상단 */}
+      {/* Save — 최상단 */}
       <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border-secondary)' }}>
-        {isExpanded && ctx.lastSyncError && (
-          <div
-            style={{
-              padding: '6px 8px',
-              marginBottom: 6,
-              borderRadius: 4,
-              fontSize: '0.75rem',
-              background: '#fff3cd',
-              color: '#856404',
-              border: '1px solid #ffc107',
-            }}
-          >
-            {ctx.lastSyncError}
-            <button
-              onClick={handleLoad}
-              style={{
-                display: 'block',
-                marginTop: 4,
-                padding: '3px 8px',
-                border: '1px solid #856404',
-                borderRadius: 3,
-                background: 'transparent',
-                color: '#856404',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-              }}
-            >
-              Load로 최신 데이터 가져오기
-            </button>
-          </div>
-        )}
         {isExpanded && status && (
           <div
             style={{
@@ -274,9 +227,6 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
         <div style={{ display: 'flex', flexDirection: isExpanded ? 'row' : 'column', gap: 6 }}>
           <button onClick={handleSave} disabled={loading} style={isExpanded ? syncBtn : iconBtn} title="Save">
             {isExpanded ? (loading ? '...' : 'Save') : '\u{1F4BE}'}
-          </button>
-          <button onClick={handleLoad} disabled={loading} style={isExpanded ? syncBtn : iconBtn} title="Load">
-            {isExpanded ? (loading ? '...' : 'Load') : '\u{1F4E5}'}
           </button>
         </div>
       </div>

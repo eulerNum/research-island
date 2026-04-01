@@ -3,17 +3,6 @@ import type { ResearchMap } from './types';
 const CONFIG_KEY = 'github-config';
 const LEGACY_FILE_PATH = 'data/research-map.json';
 
-// Track the SHA we last loaded/saved so we can detect remote changes
-const knownShaMap = new Map<string, string>();
-
-/** Custom error for conflict detection */
-export class ConflictError extends Error {
-  constructor() {
-    super('다른 기기에서 변경됨 — 먼저 Load한 후 다시 저장하세요.');
-    this.name = 'ConflictError';
-  }
-}
-
 function mapFilePath(mapId: string): string {
   return `data/maps/${mapId}.json`;
 }
@@ -78,11 +67,28 @@ export async function saveToGitHub(
   config: GitHubConfig,
   map: ResearchMap,
   mapId?: string,
-  force?: boolean,
 ): Promise<void> {
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
   const jsonStr = JSON.stringify(map, null, 2);
   const content = utf8ToBase64(jsonStr);
+
+  const doPut = async (sha: string | null): Promise<{ res: Response; result: Record<string, unknown> | null }> => {
+    const putBody: Record<string, string> = {
+      message: `Update map ${mapId ?? 'legacy'}`,
+      content,
+    };
+    if (sha) putBody.sha = sha;
+    const r = await fetch(contentsUrl(config, filePath), {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(putBody),
+    });
+    const d = await r.json().catch(() => null);
+    return { res: r, result: d };
+  };
 
   let remoteSha: string | null;
   try {
@@ -91,44 +97,26 @@ export async function saveToGitHub(
     throw new Error('GitHub 연결 실패 — 네트워크를 확인하세요.');
   }
 
-  // Conflict detection: if remote SHA differs from our last-known SHA,
-  // another device has saved since we last loaded/saved.
-  if (!force && remoteSha) {
-    const knownSha = knownShaMap.get(filePath);
-    if (knownSha && knownSha !== remoteSha) {
-      throw new ConflictError();
-    }
-  }
-
-  // When force-saving, always use the latest remote SHA
-  const body: Record<string, string> = {
-    message: `Update map ${mapId ?? 'legacy'}`,
-    content,
-  };
-  if (remoteSha) body.sha = remoteSha;
-
   let res: Response;
+  let result: Record<string, unknown> | null;
   try {
-    res = await fetch(contentsUrl(config, filePath), {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
+    ({ res, result } = await doPut(remoteSha));
   } catch {
     throw new Error('GitHub 저장 실패 — 네트워크를 확인하세요.');
   }
 
-  const result = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(result?.message || `GitHub save failed: ${res.status}`);
+  // 409 = SHA changed between getFileSha and PUT — retry once with fresh SHA
+  if (res.status === 409) {
+    const latestSha = await getFileSha(config, filePath);
+    try {
+      ({ res, result } = await doPut(latestSha));
+    } catch {
+      throw new Error('GitHub 저장 실패 — 네트워크를 확인하세요.');
+    }
   }
 
-  // Update known SHA after successful save
-  if (result?.content?.sha) {
-    knownShaMap.set(filePath, result.content.sha);
+  if (!res.ok) {
+    throw new Error((result?.message as string) || `GitHub save failed: ${res.status}`);
   }
 }
 
@@ -145,13 +133,11 @@ export async function loadFromGitHub(
   } catch {
     throw new Error('GitHub 로드 실패 — 네트워크를 확인하세요.');
   }
+  if (res.status === 409) {
+    throw new Error('GitHub 레포 충돌 — GitHub에서 레포 상태를 확인하세요.');
+  }
   if (!res.ok) throw new Error(`GitHub load failed: ${res.status}`);
   const data = await res.json();
-
-  // Track SHA so we can detect conflicts on next save
-  if (data.sha) {
-    knownShaMap.set(filePath, data.sha);
-  }
 
   // GitHub Contents API returns content: null for files > 1MB.
   // Use Git Blob API instead (raw.githubusercontent.com doesn't support CORS with auth).
