@@ -25,8 +25,8 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
   const [searchQuery, setSearchQuery] = useState('');
   const [groupBy, setGroupBy] = useState<'none' | 'year' | 'journal'>('year');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [collapsed, setCollapsed] = useState(true);
-  const [pinned, setPinned] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [pinned, setPinned] = useState(true);
   const collapseTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -653,32 +653,10 @@ function PaperItem({ paper, highlightedPaperId, onHighlightPaper, onSelectPaper,
         gap: 4,
       }}
     >
-      {/* Highlight toggle button */}
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onHighlightPaper?.(isHighlighted ? null : paper.id);
-        }}
-        title="맵에서 하이라이트"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          fontSize: '0.75rem',
-          padding: 0,
-          flexShrink: 0,
-          opacity: isHighlighted ? 1 : 0.4,
-          filter: isHighlighted ? 'none' : 'grayscale(1)',
-          transition: 'opacity 0.15s',
-        }}
-        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
-        onMouseLeave={(e) => { if (!isHighlighted) (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
-      >
-        {isHighlighted ? '\u{1F4A1}' : '\u{1F4A1}'}
-      </button>
-      {/* Title — click to open in DetailPanel */}
+      {/* Click = glow highlight, Double-click = study panel */}
       <span
-        onClick={() => onSelectPaper?.(paper.id)}
+        onClick={() => onHighlightPaper?.(isHighlighted ? null : paper.id)}
+        onDoubleClick={() => onSelectPaper?.(paper.id)}
         style={{ flex: 1, cursor: 'pointer' }}
       >
         {paper.title}{showYear ? ` (${paper.year})` : ''}
