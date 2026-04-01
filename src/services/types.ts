@@ -9,6 +9,7 @@ export interface Paper {
   journal?: string;
   abstract?: string;
   comment?: string;
+  aiSummary?: string;
   figureUrls?: string[];
   citationCount?: number;
   url?: string;

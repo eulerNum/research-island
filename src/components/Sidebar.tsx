@@ -80,6 +80,34 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
     return { entries, max };
   }, [data.papers]);
 
+  // Paper → bridge/road placement tooltip lookup
+  const paperTooltipMap = useMemo(() => {
+    const map = new Map<string, string>();
+    const islandName = (id: string) => data.islands.find((i) => i.id === id)?.name ?? '?';
+    const cityName = (id: string) => {
+      for (const island of data.islands) {
+        const city = island.cities.find((c) => c.id === id);
+        if (city) return city.name;
+      }
+      return '?';
+    };
+    for (const p of data.papers) {
+      const lines: string[] = [];
+      for (const b of data.bridges) {
+        if (b.paperIds.includes(p.id)) {
+          lines.push(`Bridge: ${islandName(b.sourceIslandId)}\u2192${islandName(b.targetIslandId)}${b.label ? `: ${b.label}` : ''}`);
+        }
+      }
+      for (const r of data.roads) {
+        if (r.paperIds.includes(p.id)) {
+          lines.push(`Road: ${cityName(r.sourceCityId)}\u2192${cityName(r.targetCityId)}${r.label ? `: ${r.label}` : ''}`);
+        }
+      }
+      if (lines.length > 0) map.set(p.id, lines.join('\n'));
+    }
+    return map;
+  }, [data]);
+
   const toggleGroupCollapse = (key: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -444,6 +472,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
                         onSelectPaper={onSelectPaper}
                         onDelete={() => ctx.deletePaper(paper.id)}
                         showYear={groupBy !== 'year'}
+                        tooltipText={paperTooltipMap.get(paper.id)}
                       />
                     ))}
                   </ul>
@@ -462,6 +491,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
                 onSelectPaper={onSelectPaper}
                 onDelete={() => ctx.deletePaper(paper.id)}
                 showYear
+                tooltipText={paperTooltipMap.get(paper.id)}
               />
             ))}
           </ul>
@@ -575,15 +605,31 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
    1. Highlight icon (bulb) click → glow on map
    2. Title click → open in DetailPanel
    3. Drag → drop on bridge/road */
-function PaperItem({ paper, highlightedPaperId, onHighlightPaper, onSelectPaper, onDelete, showYear }: {
+function PaperItem({ paper, highlightedPaperId, onHighlightPaper, onSelectPaper, onDelete, showYear, tooltipText }: {
   paper: { id: string; title: string; year: number };
   highlightedPaperId?: string | null;
   onHighlightPaper?: (paperId: string | null) => void;
   onSelectPaper?: (paperId: string) => void;
   onDelete: () => void;
   showYear: boolean;
+  tooltipText?: string;
 }) {
   const isHighlighted = highlightedPaperId === paper.id;
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+  const tooltipTimer = useRef<number | null>(null);
+
+  const handleMouseEnter = (e: React.MouseEvent) => {
+    if (!tooltipText) return;
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setTooltipPos({ x: rect.right + 8, y: rect.top });
+    tooltipTimer.current = window.setTimeout(() => setShowTooltip(true), 300);
+  };
+  const handleMouseLeave = () => {
+    if (tooltipTimer.current) { clearTimeout(tooltipTimer.current); tooltipTimer.current = null; }
+    setShowTooltip(false);
+  };
+
   return (
     <li
       draggable
@@ -591,6 +637,8 @@ function PaperItem({ paper, highlightedPaperId, onHighlightPaper, onSelectPaper,
         e.dataTransfer.setData('application/paper-id', paper.id);
         e.dataTransfer.effectAllowed = 'copy';
       }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       style={{
         padding: '3px 6px',
         fontSize: '0.8rem',
@@ -656,6 +704,28 @@ function PaperItem({ paper, highlightedPaperId, onHighlightPaper, onSelectPaper,
       >
         &#x2715;
       </button>
+      {showTooltip && tooltipText && (
+        <div
+          style={{
+            position: 'fixed',
+            left: tooltipPos.x,
+            top: tooltipPos.y,
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-secondary)',
+            borderRadius: 6,
+            padding: '6px 10px',
+            fontSize: '0.7rem',
+            color: 'var(--text-secondary)',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            zIndex: 9999,
+            maxWidth: 250,
+            whiteSpace: 'pre-line',
+            pointerEvents: 'none',
+          }}
+        >
+          {tooltipText}
+        </div>
+      )}
     </li>
   );
 }

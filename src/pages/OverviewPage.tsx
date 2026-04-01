@@ -12,6 +12,7 @@ import type { ContextMenuItem, ContextMenuPaletteItem } from '../components/Cont
 import type { MapContextMenuEvent } from '../components/IslandMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
 import GapPostitAnimation from '../components/GapPostitAnimation';
+import PaperStudyPanel from '../components/PaperStudyPanel';
 
 const ISLAND_COLORS = ['#8ecae6', '#a8dadc', '#b5e48c', '#ffd166', '#e8c1a0', '#d4a5a5'];
 
@@ -38,7 +39,7 @@ export default function OverviewPage() {
     return param;
   });
   const [highlightedPaperId, setHighlightedPaperId] = useState<string | null>(null);
-  const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
+  const [studyPaperId, setStudyPaperId] = useState<string | null>(null);
   const [expandedIslandId, setExpandedIslandId] = useState<string | null>(null);
   const [gapPostit, setGapPostit] = useState<{
     gapId: string;
@@ -141,19 +142,11 @@ export default function OverviewPage() {
   }, [ctx.mapData.islands]);
 
   const handleSelectPaper = useCallback((paperId: string) => {
-    // Find first bridge containing this paper
-    const bridge = ctx.mapData.bridges.find((b) => b.paperIds.includes(paperId));
-    if (bridge) {
-      setSelectedBridgeId(bridge.id);
-      setHighlightedPaperId(paperId);
-      setSelectedPaperId(null);
-    } else {
-      // No bridge — show paper standalone in DetailPanel
-      setSelectedBridgeId(null);
-      setSelectedPaperId(paperId);
-      setHighlightedPaperId(paperId);
-    }
-  }, [ctx.mapData.bridges]);
+    // Open Paper Study Panel (closes bridge DetailPanel)
+    setSelectedBridgeId(null);
+    setStudyPaperId(paperId);
+    setHighlightedPaperId(paperId);
+  }, []);
 
   const handleGapAnimate = useCallback((gapId: string, description: string, sourceRect: DOMRect) => {
     // Find the bridge that contains this gap
@@ -295,8 +288,8 @@ export default function OverviewPage() {
     ? ctx.mapData.bridges.find((b) => b.id === selectedBridgeId)
     : undefined;
 
-  const standalonePaper = (!selectedBridge && selectedPaperId)
-    ? ctx.mapData.papers.find((p) => p.id === selectedPaperId)
+  const studyPaper = studyPaperId
+    ? ctx.mapData.papers.find((p) => p.id === studyPaperId)
     : undefined;
 
   return (
@@ -310,7 +303,7 @@ export default function OverviewPage() {
       />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar data={ctx.mapData} highlightedPaperId={highlightedPaperId} onHighlightPaper={setHighlightedPaperId} onSelectPaper={handleSelectPaper} onGapAnimate={handleGapAnimate} />
-        <main style={{ flex: 1, position: 'relative' }}>
+        <main style={{ flex: studyPaper ? 0.4 : 1, minWidth: 300, position: 'relative', transition: 'flex 0.3s ease' }}>
           <IslandMap
             ref={mapSvgRef}
             data={ctx.mapData}
@@ -358,26 +351,18 @@ export default function OverviewPage() {
             onClose={() => { setSelectedBridgeId(null); setHighlightedPaperId(null); }}
           />
         )}
-        {standalonePaper && (
-          <DetailPanel
-            paper={standalonePaper}
-            papers={ctx.mapData.papers}
-            gaps={ctx.mapData.gaps}
+        {studyPaper && (
+          <PaperStudyPanel
+            paper={studyPaper}
             allBridges={ctx.mapData.bridges}
             allRoads={ctx.mapData.roads}
-            allIslandCityMap={cityIslandMap}
             islandNameMap={islandNameMap}
             cityNameMap={cityNameMap}
-            highlightedPaperId={highlightedPaperId}
-            onAddPaper={() => {}}
-            onAddGap={() => {}}
-            onDeleteGap={() => {}}
+            allIslandCityMap={cityIslandMap}
             onUpdatePaper={ctx.updatePaper}
-            onDeletePaper={ctx.deletePaper}
-            onHighlightPaper={setHighlightedPaperId}
             onNavigateToBridge={handleNavigateToBridge}
             onNavigateToRoad={handleNavigateToRoad}
-            onClose={() => { setSelectedPaperId(null); setHighlightedPaperId(null); }}
+            onClose={() => { setStudyPaperId(null); setHighlightedPaperId(null); }}
           />
         )}
       </div>

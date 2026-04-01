@@ -21,7 +21,6 @@ interface CrossRef {
 interface DetailPanelProps {
   bridge?: Bridge;
   road?: Road;
-  paper?: Paper; // standalone paper view (no bridge/road context)
   papers: Paper[];
   gaps: ResearchGap[];
   allBridges: Bridge[];
@@ -47,7 +46,6 @@ interface DetailPanelProps {
 export default function DetailPanel({
   bridge,
   road,
-  paper: standalonePaper,
   papers,
   gaps,
   allBridges,
@@ -107,110 +105,6 @@ export default function DetailPanel({
     }
     return map;
   }, [linkedPapers, allBridges, allRoads, allIslandCityMap, islandNameMap, cityNameMap, bridge, road]);
-
-  // Standalone paper mode (no bridge/road)
-  if (!entity && standalonePaper) {
-    const crossRefs: CrossRef[] = [];
-    for (const b of allBridges) {
-      if (b.paperIds.includes(standalonePaper.id)) {
-        const src = islandNameMap?.get(b.sourceIslandId) ?? '?';
-        const tgt = islandNameMap?.get(b.targetIslandId) ?? '?';
-        crossRefs.push({ type: 'bridge', id: b.id, label: b.label ? `${src}\u2192${tgt}: ${b.label}` : `${src}\u2192${tgt}`, direction: b.direction });
-      }
-    }
-    for (const r of allRoads) {
-      if (r.paperIds.includes(standalonePaper.id)) {
-        const islandId = allIslandCityMap?.get(r.sourceCityId) ?? allIslandCityMap?.get(r.targetCityId);
-        const src = cityNameMap?.get(r.sourceCityId) ?? '?';
-        const tgt = cityNameMap?.get(r.targetCityId) ?? '?';
-        crossRefs.push({ type: 'road', id: r.id, label: r.label ? `${src}\u2192${tgt}: ${r.label}` : `${src}\u2192${tgt}`, direction: r.direction, islandId });
-      }
-    }
-
-    return (
-      <aside
-        style={{
-          width: 360,
-          borderLeft: '1px solid var(--border-secondary)',
-          background: 'var(--bg-primary)',
-          overflowY: 'auto',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 12,
-          flexShrink: 0,
-        }}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '1rem', margin: 0, color: 'var(--text-heading)' }}>
-            {standalonePaper.title}
-          </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.2rem', color: 'var(--text-muted)' }}>&times;</button>
-        </div>
-        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-          {standalonePaper.authors.join(', ')} ({standalonePaper.year})
-        </div>
-        {standalonePaper.journal && (
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>
-            {standalonePaper.journal}
-          </div>
-        )}
-        {standalonePaper.comment && (
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', padding: '8px', background: 'var(--bg-secondary)', borderRadius: 4 }}>
-            {standalonePaper.comment}
-          </div>
-        )}
-        {standalonePaper.url && (
-          <a href={standalonePaper.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.8rem', color: 'var(--accent-forward)' }}>
-            DOI Link
-          </a>
-        )}
-        {crossRefs.length > 0 && (
-          <div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', fontWeight: 600, marginBottom: 4 }}>
-              Also in:
-            </div>
-            {crossRefs.map((ref) => (
-              <div
-                key={`${ref.type}-${ref.id}`}
-                onClick={() => {
-                  if (ref.type === 'bridge') onNavigateToBridge?.(ref.id);
-                  else if (ref.islandId) onNavigateToRoad?.(ref.id, ref.islandId);
-                }}
-                style={{
-                  fontSize: '0.75rem',
-                  color: ref.direction === 'forward' ? 'var(--accent-forward)' : 'var(--accent-backward)',
-                  cursor: 'pointer',
-                  padding: '2px 0',
-                }}
-              >
-                {ref.type === 'bridge' ? 'Bridge' : 'Road'}: {ref.label}
-              </div>
-            ))}
-          </div>
-        )}
-        {onUpdatePaper && (
-          <button
-            onClick={() => { setEditingPaper(standalonePaper); setShowPaperForm(true); }}
-            style={{ padding: '6px 12px', border: '1px solid var(--btn-secondary-border)', borderRadius: 4, background: 'var(--btn-secondary-bg)', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '0.8rem' }}
-          >
-            Edit Paper
-          </button>
-        )}
-        {showPaperForm && (
-          <PaperForm
-            initialPaper={editingPaper ?? undefined}
-            onSubmit={(paper) => {
-              if (editingPaper) onUpdatePaper?.(paper);
-              setShowPaperForm(false);
-              setEditingPaper(null);
-            }}
-            onCancel={() => { setShowPaperForm(false); setEditingPaper(null); }}
-          />
-        )}
-      </aside>
-    );
-  }
 
   if (!entity) return null;
 
