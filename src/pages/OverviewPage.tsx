@@ -11,6 +11,7 @@ import ContextMenu from '../components/ContextMenu';
 import type { ContextMenuItem, ContextMenuPaletteItem } from '../components/ContextMenu';
 import type { MapContextMenuEvent } from '../components/IslandMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
+import GapPostitAnimation from '../components/GapPostitAnimation';
 
 const ISLAND_COLORS = ['#8ecae6', '#a8dadc', '#b5e48c', '#ffd166', '#e8c1a0', '#d4a5a5'];
 
@@ -37,6 +38,14 @@ export default function OverviewPage() {
     return param;
   });
   const [highlightedPaperId, setHighlightedPaperId] = useState<string | null>(null);
+  const [selectedPaperId, setSelectedPaperId] = useState<string | null>(null);
+  const [expandedIslandId, setExpandedIslandId] = useState<string | null>(null);
+  const [gapPostit, setGapPostit] = useState<{
+    gapId: string;
+    description: string;
+    startRect: DOMRect;
+    endRect: { x: number; y: number } | null;
+  } | null>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
@@ -66,11 +75,16 @@ export default function OverviewPage() {
           toolbar.resetConnection();
         }
       } else {
-        navigate(`island/${islandId}`);
+        // Toggle island expand (show cities in overview)
+        setExpandedIslandId((prev) => prev === islandId ? null : islandId);
       }
     },
-    [toolbar, ctx, navigate],
+    [toolbar, ctx],
   );
+
+  const handleIslandDoubleClick = useCallback((islandId: string) => {
+    navigate(`island/${islandId}`);
+  }, [navigate]);
 
   const handleBridgeClick = useCallback((bridgeId: string) => {
     setSelectedBridgeId(bridgeId);
@@ -125,6 +139,58 @@ export default function OverviewPage() {
     }
     return m;
   }, [ctx.mapData.islands]);
+
+  const handleSelectPaper = useCallback((paperId: string) => {
+    // Find first bridge containing this paper
+    const bridge = ctx.mapData.bridges.find((b) => b.paperIds.includes(paperId));
+    if (bridge) {
+      setSelectedBridgeId(bridge.id);
+      setHighlightedPaperId(paperId);
+      setSelectedPaperId(null);
+    } else {
+      // No bridge — show paper standalone in DetailPanel
+      setSelectedBridgeId(null);
+      setSelectedPaperId(paperId);
+      setHighlightedPaperId(paperId);
+    }
+  }, [ctx.mapData.bridges]);
+
+  const handleGapAnimate = useCallback((gapId: string, description: string, sourceRect: DOMRect) => {
+    // Find the bridge that contains this gap
+    const bridge = ctx.mapData.bridges.find((b) => b.gapIds.includes(gapId));
+    let endRect: { x: number; y: number } | null = null;
+
+    if (bridge && mapSvgRef.current) {
+      // Get bridge midpoint from SVG
+      const svgRect = mapSvgRef.current.getBoundingClientRect();
+      // Try to find the specific bridge path
+      const allGroups = mapSvgRef.current.querySelectorAll('.bridge-group');
+      const bridgeData = ctx.mapData.bridges;
+      const bridgeIdx = bridgeData.findIndex((b) => b.id === bridge.id);
+      if (bridgeIdx >= 0 && allGroups[bridgeIdx]) {
+        const path = allGroups[bridgeIdx].querySelector('.bridge') as SVGPathElement | null;
+        if (path) {
+          const totalLen = path.getTotalLength();
+          const midPoint = path.getPointAtLength(totalLen / 2);
+          // Convert SVG coordinates to screen coordinates
+          const ctm = path.getScreenCTM();
+          if (ctm) {
+            endRect = {
+              x: midPoint.x * ctm.a + ctm.e,
+              y: midPoint.y * ctm.d + ctm.f,
+            };
+          }
+        }
+      }
+
+      if (!endRect) {
+        // Fallback: center of SVG
+        endRect = { x: svgRect.left + svgRect.width / 2, y: svgRect.top + svgRect.height / 2 };
+      }
+    }
+
+    setGapPostit({ gapId, description, startRect: sourceRect, endRect });
+  }, [ctx.mapData.bridges]);
 
   const handleNavigateToBridge = useCallback((bridgeId: string) => {
     setSelectedBridgeId(bridgeId);
@@ -229,6 +295,10 @@ export default function OverviewPage() {
     ? ctx.mapData.bridges.find((b) => b.id === selectedBridgeId)
     : undefined;
 
+  const standalonePaper = (!selectedBridge && selectedPaperId)
+    ? ctx.mapData.papers.find((p) => p.id === selectedPaperId)
+    : undefined;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Toolbar
@@ -239,7 +309,7 @@ export default function OverviewPage() {
         svgRef={mapSvgRef}
       />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <Sidebar data={ctx.mapData} highlightedPaperId={highlightedPaperId} onHighlightPaper={setHighlightedPaperId} />
+        <Sidebar data={ctx.mapData} highlightedPaperId={highlightedPaperId} onHighlightPaper={setHighlightedPaperId} onSelectPaper={handleSelectPaper} onGapAnimate={handleGapAnimate} />
         <main style={{ flex: 1, position: 'relative' }}>
           <IslandMap
             ref={mapSvgRef}
@@ -247,7 +317,9 @@ export default function OverviewPage() {
             mode={toolbar.mode}
             connectionStart={toolbar.connectionStart}
             highlightedPaperId={highlightedPaperId}
+            expandedIslandId={expandedIslandId}
             onIslandClick={handleIslandClick}
+            onIslandDoubleClick={handleIslandDoubleClick}
             onBridgeClick={handleBridgeClick}
             onCanvasClick={handleCanvasClick}
             onIslandDragEnd={handleIslandDragEnd}
@@ -286,6 +358,28 @@ export default function OverviewPage() {
             onClose={() => { setSelectedBridgeId(null); setHighlightedPaperId(null); }}
           />
         )}
+        {standalonePaper && (
+          <DetailPanel
+            paper={standalonePaper}
+            papers={ctx.mapData.papers}
+            gaps={ctx.mapData.gaps}
+            allBridges={ctx.mapData.bridges}
+            allRoads={ctx.mapData.roads}
+            allIslandCityMap={cityIslandMap}
+            islandNameMap={islandNameMap}
+            cityNameMap={cityNameMap}
+            highlightedPaperId={highlightedPaperId}
+            onAddPaper={() => {}}
+            onAddGap={() => {}}
+            onDeleteGap={() => {}}
+            onUpdatePaper={ctx.updatePaper}
+            onDeletePaper={ctx.deletePaper}
+            onHighlightPaper={setHighlightedPaperId}
+            onNavigateToBridge={handleNavigateToBridge}
+            onNavigateToRoad={handleNavigateToRoad}
+            onClose={() => { setSelectedPaperId(null); setHighlightedPaperId(null); }}
+          />
+        )}
       </div>
       {contextMenu && (
         <ContextMenu
@@ -301,6 +395,15 @@ export default function OverviewPage() {
           defaultValue={promptDialog.defaultValue}
           onConfirm={promptDialog.onConfirm}
           onCancel={() => setPromptDialog(null)}
+        />
+      )}
+      {gapPostit && (
+        <GapPostitAnimation
+          gapId={gapPostit.gapId}
+          description={gapPostit.description}
+          startRect={gapPostit.startRect}
+          endRect={gapPostit.endRect}
+          onDismiss={() => setGapPostit(null)}
         />
       )}
     </div>

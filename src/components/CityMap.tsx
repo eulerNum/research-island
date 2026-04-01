@@ -243,7 +243,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .attr('class', 'road-hit')
       .attr('fill', 'none')
       .attr('stroke', 'transparent')
-      .attr('stroke-width', 14)
+      .attr('stroke-width', 28)
       .attr('d', roadPath);
 
     roadGroups
@@ -465,14 +465,14 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
     const groups = svg.selectAll<SVGGElement, Road>('.road-group');
     if (!highlightedPaperId) {
       groups.select('.road').attr('filter', null).attr('stroke-width', 2.5).attr('opacity', null);
-      groups.select('.road-hit').attr('stroke-width', 14);
+      groups.select('.road-hit').attr('stroke-width', 28);
       return;
     }
     groups.each(function (d) {
       const g = d3.select(this);
       const match = d.paperIds.includes(highlightedPaperId);
       g.select('.road').attr('filter', match ? 'url(#road-glow)' : null).attr('stroke-width', match ? 4 : 2.5).attr('opacity', match ? 1 : 0.2);
-      g.select('.road-hit').attr('stroke-width', match ? 18 : 14);
+      g.select('.road-hit').attr('stroke-width', match ? 34 : 28);
     });
   }, [highlightedPaperId, roads]);
 

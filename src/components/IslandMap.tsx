@@ -16,7 +16,9 @@ interface IslandMapProps {
   mode: ToolbarMode;
   connectionStart: string | null;
   highlightedPaperId?: string | null;
+  expandedIslandId?: string | null;
   onIslandClick: (islandId: string) => void;
+  onIslandDoubleClick?: (islandId: string) => void;
   onBridgeClick: (bridgeId: string) => void;
   onCanvasClick: (position: { x: number; y: number }) => void;
   onIslandDragEnd: (islandId: string, position: { x: number; y: number }) => void;
@@ -33,7 +35,9 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
   mode,
   connectionStart,
   highlightedPaperId,
+  expandedIslandId,
   onIslandClick,
+  onIslandDoubleClick,
   onBridgeClick,
   onCanvasClick,
   onIslandDragEnd,
@@ -53,6 +57,8 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
   const connectionStartRef = useRef(connectionStart);
   const onContextMenuRef = useRef(onContextMenu);
   const onPaperDropOnBridgeRef = useRef(onPaperDropOnBridge);
+  const onIslandDoubleClickRef = useRef(onIslandDoubleClick);
+  const expandedIslandIdRef = useRef(expandedIslandId);
 
   useEffect(() => {
     modeRef.current = mode;
@@ -63,6 +69,8 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
     connectionStartRef.current = connectionStart;
     onContextMenuRef.current = onContextMenu;
     onPaperDropOnBridgeRef.current = onPaperDropOnBridge;
+    onIslandDoubleClickRef.current = onIslandDoubleClick;
+    expandedIslandIdRef.current = expandedIslandId;
   });
 
   useEffect(() => {
@@ -91,6 +99,14 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       }
       .bridge-backward {
         animation: dash-flow-backward 0.8s linear infinite;
+      }
+      .dragging-paper .bridge {
+        stroke-opacity: 1;
+        stroke-width: 4;
+      }
+      .dragging-paper .bridge-hit {
+        stroke: rgba(255, 215, 0, 0.15);
+        stroke-width: 40;
       }
     `);
 
@@ -129,6 +145,8 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
         g.attr('transform', event.transform.toString());
       });
     svg.call(zoom);
+    // Disable D3 default double-click zoom (we use dblclick for island navigation)
+    svg.on('dblclick.zoom', null);
 
     // Canvas click (for add-island mode)
     svg.on('click', (event: MouseEvent) => {
@@ -205,13 +223,13 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       });
     });
 
-    // Invisible wide hit area for easy clicking
+    // Invisible wide hit area for easy clicking and drag-drop
     const bridgeHitAreas = bridgeGroups
       .append('path')
       .attr('class', 'bridge-hit')
       .attr('fill', 'none')
       .attr('stroke', 'transparent')
-      .attr('stroke-width', 16);
+      .attr('stroke-width', 32);
 
     // Visible bridge path with flowing dash animation
     const bridgeLines = bridgeGroups
@@ -273,6 +291,9 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .text((d) => d.paperIds.filter((pid) => paperIdSet.has(pid)).length);
 
     // Island ellipses
+    // Click/double-click timer for island interaction
+    let islandClickTimer: number | null = null;
+
     const islandGroups = g
       .selectAll<SVGGElement, SimNode>('.island-group')
       .data(nodes)
@@ -282,12 +303,36 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .attr('cursor', 'pointer')
       .on('click', (_event, d) => {
         _event.stopPropagation();
-        onIslandClickRef.current(d.island.id);
+        if (islandClickTimer) {
+          // Double click detected
+          clearTimeout(islandClickTimer);
+          islandClickTimer = null;
+          onIslandDoubleClickRef.current?.(d.island.id);
+          return;
+        }
+        islandClickTimer = window.setTimeout(() => {
+          islandClickTimer = null;
+          onIslandClickRef.current(d.island.id);
+        }, 250);
       })
       .on('contextmenu', (_event: MouseEvent, d) => {
         _event.preventDefault();
         _event.stopPropagation();
         onContextMenuRef.current?.({ type: 'island', id: d.island.id, screenX: _event.clientX, screenY: _event.clientY });
+      })
+      // Hover highlight
+      .on('mouseenter', function () {
+        d3.select(this).select('ellipse')
+          .transition().duration(150)
+          .attr('opacity', 1)
+          .attr('stroke-width', 4);
+      })
+      .on('mouseleave', function (_event, d) {
+        const isConn = connectionStartRef.current === d.island.id;
+        d3.select(this).select('ellipse')
+          .transition().duration(150)
+          .attr('opacity', 0.85)
+          .attr('stroke-width', isConn ? 4 : 2);
       });
 
     islandGroups
@@ -515,9 +560,31 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       simulationRef.current = null;
     }
 
+    // Show all bridges as drop targets during paper drag
+    const svgEl = svgRef.current!;
+    const handleDragEnter = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('application/paper-id')) {
+        svgEl.classList.add('dragging-paper');
+      }
+    };
+    const handleDragLeaveDoc = (e: DragEvent) => {
+      if (e.dataTransfer?.types.includes('application/paper-id') && !svgEl.contains(e.relatedTarget as Node)) {
+        svgEl.classList.remove('dragging-paper');
+      }
+    };
+    const handleDragEndDoc = () => {
+      svgEl.classList.remove('dragging-paper');
+    };
+    svgEl.addEventListener('dragenter', handleDragEnter);
+    svgEl.addEventListener('dragleave', handleDragLeaveDoc);
+    document.addEventListener('dragend', handleDragEndDoc);
+
     return () => {
       simulationRef.current?.stop();
       simulationRef.current = null;
+      svgEl.removeEventListener('dragenter', handleDragEnter);
+      svgEl.removeEventListener('dragleave', handleDragLeaveDoc);
+      document.removeEventListener('dragend', handleDragEndDoc);
     };
   }, [data, connectionStart]);
 
@@ -528,6 +595,88 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
         mode === 'add-island' ? 'crosshair' : mode === 'bridge-connect' ? 'pointer' : 'default';
     }
   }, [mode]);
+
+  // Expand/collapse island to show cities
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+    const g = svg.select('g');
+
+    // Remove all previous city sub-groups
+    g.selectAll('.island-cities').remove();
+
+    if (!expandedIslandId) return;
+
+    const island = data.islands.find((i) => i.id === expandedIslandId);
+    if (!island || island.cities.length === 0) return;
+
+    // Find the island group and expand its ellipse
+    const islandGroup = g.selectAll<SVGGElement, SimNode>('.island-group')
+      .filter((d) => d.island.id === expandedIslandId);
+
+    if (islandGroup.empty()) return;
+
+    // Get island position for zoom
+    const node = islandGroup.datum();
+    const expandedRx = 80 + Math.max(island.cities.length * 15, 40);
+    const expandedRy = 50 + Math.max(island.cities.length * 10, 25);
+
+    // Expand the ellipse
+    islandGroup.select('ellipse')
+      .transition().duration(300)
+      .attr('rx', expandedRx)
+      .attr('ry', expandedRy);
+
+    // Add city nodes inside the island
+    const cityGroup = islandGroup.append('g').attr('class', 'island-cities');
+    const cityAngle = (2 * Math.PI) / island.cities.length;
+    const innerRx = expandedRx * 0.6;
+    const innerRy = expandedRy * 0.55;
+
+    island.cities.forEach((city, i) => {
+      const angle = cityAngle * i - Math.PI / 2;
+      const cx = Math.cos(angle) * innerRx;
+      const cy = Math.sin(angle) * innerRy + 5;
+
+      const cg = cityGroup.append('g').attr('transform', `translate(${cx},${cy})`);
+      cg.append('circle')
+        .attr('r', 0)
+        .attr('fill', island.color ?? '#8ecae6')
+        .attr('stroke', 'var(--island-stroke)')
+        .attr('stroke-width', 1)
+        .attr('opacity', 0.9)
+        .transition().duration(300).delay(i * 50)
+        .attr('r', 14);
+      cg.append('text')
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .attr('font-size', '8px')
+        .attr('fill', 'var(--text-heading)')
+        .attr('pointer-events', 'none')
+        .attr('opacity', 0)
+        .text(city.name.length > 10 ? city.name.slice(0, 9) + '..' : city.name)
+        .transition().duration(300).delay(i * 50 + 150)
+        .attr('opacity', 1);
+    });
+
+    // Pan to the expanded island
+    if (node.x != null && node.y != null) {
+      const zoomBehavior = d3.zoom<SVGSVGElement, unknown>().scaleExtent([0.3, 5]);
+      svg.transition().duration(400).call(
+        zoomBehavior.translateTo as never,
+        node.x, node.y,
+      );
+    }
+
+    return () => {
+      // Collapse: restore ellipse and remove cities
+      islandGroup.select('ellipse')
+        .transition().duration(200)
+        .attr('rx', 80)
+        .attr('ry', 50);
+      g.selectAll('.island-cities').remove();
+    };
+  }, [expandedIslandId, data.islands]);
 
   // Highlight bridges that contain the highlighted paper (no full D3 re-render)
   useEffect(() => {

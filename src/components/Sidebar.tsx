@@ -1,33 +1,44 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { ResearchMap } from '../services/types';
 import { useMapDataContext } from '../contexts/MapDataContext';
 import GitHubSettings from './GitHubSettings';
-import SheetsSettings from './SheetsSettings';
-import ClaudeSettings from './ClaudeSettings';
 import { getGitHubConfig } from '../services/githubService';
-import { getSheetsConfig, syncToSheets, syncFromSheets, reconcilePapers } from '../services/sheetsService';
-import * as mapService from '../services/mapService';
 
 interface SidebarProps {
   data: ResearchMap;
   highlightedPaperId?: string | null;
   onHighlightPaper?: (paperId: string | null) => void;
+  onSelectPaper?: (paperId: string) => void;
+  onGapAnimate?: (gapId: string, description: string, sourceRect: DOMRect) => void;
 }
 
-export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: SidebarProps) {
+export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, onSelectPaper, onGapAnimate }: SidebarProps) {
   const navigate = useNavigate();
   const { mapId } = useParams<{ mapId: string }>();
   const basePath = mapId ? `/map/${mapId}` : '';
   const ctx = useMapDataContext();
   const [showGitHubSettings, setShowGitHubSettings] = useState(false);
-  const [showSheetsSettings, setShowSheetsSettings] = useState(false);
-  const [showClaudeSettings, setShowClaudeSettings] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedIslands, setExpandedIslands] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [groupBy, setGroupBy] = useState<'none' | 'year' | 'journal'>('year');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState(true);
+  const [pinned, setPinned] = useState(false);
+  const collapseTimer = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleMouseEnter = useCallback(() => {
+    if (collapseTimer.current) { clearTimeout(collapseTimer.current); collapseTimer.current = null; }
+    setCollapsed(false);
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    if (pinned) return;
+    collapseTimer.current = window.setTimeout(() => setCollapsed(true), 200);
+  }, [pinned]);
 
   const filteredPapers = useMemo(() => {
     if (!searchQuery.trim()) return data.papers;
@@ -41,12 +52,42 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
     );
   }, [data.papers, searchQuery]);
 
-  // Island name lookup for bridges
-  const islandNameMap = useMemo(() => {
-    const m = new Map<string, string>();
-    for (const i of data.islands) m.set(i.id, i.name);
-    return m;
-  }, [data.islands]);
+  const groupedPapers = useMemo(() => {
+    if (groupBy === 'none') return null;
+    const groups = new Map<string, typeof filteredPapers>();
+    for (const p of filteredPapers) {
+      const key = groupBy === 'year' ? String(p.year) : (p.journal || 'Unknown');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(p);
+    }
+    // Sort: year descending, journal alphabetical
+    const entries = Array.from(groups.entries());
+    if (groupBy === 'year') {
+      entries.sort((a, b) => Number(b[0]) - Number(a[0]));
+    } else {
+      entries.sort((a, b) => a[0].localeCompare(b[0]));
+    }
+    return entries;
+  }, [filteredPapers, groupBy]);
+
+  const yearDistribution = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const p of data.papers) {
+      counts.set(p.year, (counts.get(p.year) || 0) + 1);
+    }
+    const entries = Array.from(counts.entries()).sort((a, b) => a[0] - b[0]);
+    const max = Math.max(...entries.map(([, c]) => c), 1);
+    return { entries, max };
+  }, [data.papers]);
+
+  const toggleGroupCollapse = (key: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   const toggleExpand = (islandId: string) => {
     setExpandedIslands((prev) => {
@@ -94,58 +135,28 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
     }
   };
 
-  const handleSheetsPush = async () => {
-    const config = getSheetsConfig();
-    if (!config?.pushUrl) {
-      setShowSheetsSettings(true);
-      return;
-    }
-    setLoading(true);
-    try {
-      await syncToSheets(config.pushUrl, data.papers);
-      showStatus('success', 'Pushed to Sheets!');
-    } catch (e) {
-      showStatus('error', (e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSheetsPull = async () => {
-    const config = getSheetsConfig();
-    if (!config?.pullUrl) {
-      setShowSheetsSettings(true);
-      return;
-    }
-    setLoading(true);
-    try {
-      const remote = await syncFromSheets(config.pullUrl);
-      const merged = reconcilePapers(data.papers, remote);
-      const fullMap = mapService.getFullMap();
-      fullMap.papers = merged;
-      ctx.importMap(fullMap);
-      showStatus('success', `Pulled! ${merged.length - data.papers.length} new papers`);
-    } catch (e) {
-      showStatus('error', (e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isExpanded = !collapsed;
 
   return (
     <aside
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       style={{
-        width: 260,
-        padding: '14px',
+        width: isExpanded ? 260 : 48,
+        padding: isExpanded ? '14px' : '14px 6px',
         borderRight: '1px solid var(--border-secondary)',
-        overflowY: 'auto',
+        overflowY: isExpanded ? 'auto' : 'hidden',
+        overflowX: 'hidden',
         background: 'var(--bg-primary)',
         display: 'flex',
         flexDirection: 'column',
         flexShrink: 0,
+        transition: 'width 0.2s ease, padding 0.2s ease',
+        whiteSpace: isExpanded ? 'normal' : 'nowrap',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, minHeight: 24 }}>
         <button
           onClick={() => navigate('/')}
           title="홈으로"
@@ -156,20 +167,122 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
             fontSize: '1rem',
             color: 'var(--text-muted)',
             padding: 0,
+            flexShrink: 0,
           }}
         >
           &larr;
         </button>
-        <h2 style={{ fontSize: '1rem', margin: 0, color: 'var(--text-heading)' }}>
-          Research Island Map
-        </h2>
+        {isExpanded && (
+          <>
+            <h2 style={{ fontSize: '1rem', margin: 0, color: 'var(--text-heading)', flex: 1 }}>
+              Research Island Map
+            </h2>
+            <button
+              onClick={() => setPinned((p) => !p)}
+              title={pinned ? '사이드바 자동 접기' : '사이드바 고정'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                color: pinned ? 'var(--accent-forward)' : 'var(--text-muted)',
+                padding: 0,
+                flexShrink: 0,
+              }}
+            >
+              {pinned ? '\u{1F4CC}' : '\u{1F4CC}'}
+            </button>
+          </>
+        )}
       </div>
 
-      <section>
+      {/* Save/Load — 최상단 */}
+      <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border-secondary)' }}>
+        {isExpanded && ctx.lastSyncError && (
+          <div
+            style={{
+              padding: '6px 8px',
+              marginBottom: 6,
+              borderRadius: 4,
+              fontSize: '0.75rem',
+              background: '#fff3cd',
+              color: '#856404',
+              border: '1px solid #ffc107',
+            }}
+          >
+            {ctx.lastSyncError}
+            <button
+              onClick={handleLoad}
+              style={{
+                display: 'block',
+                marginTop: 4,
+                padding: '3px 8px',
+                border: '1px solid #856404',
+                borderRadius: 3,
+                background: 'transparent',
+                color: '#856404',
+                cursor: 'pointer',
+                fontSize: '0.7rem',
+              }}
+            >
+              Load로 최신 데이터 가져오기
+            </button>
+          </div>
+        )}
+        {isExpanded && status && (
+          <div
+            style={{
+              padding: '6px 8px',
+              marginBottom: 6,
+              borderRadius: 4,
+              fontSize: '0.8rem',
+              background: status.type === 'success' ? 'var(--bg-status-success)' : 'var(--bg-status-error)',
+              color: status.type === 'success' ? 'var(--text-status-success)' : 'var(--text-status-error)',
+            }}
+          >
+            {status.msg}
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: isExpanded ? 'row' : 'column', gap: 6 }}>
+          <button onClick={handleSave} disabled={loading} style={isExpanded ? syncBtn : iconBtn} title="Save">
+            {isExpanded ? (loading ? '...' : 'Save') : '\u{1F4BE}'}
+          </button>
+          <button onClick={handleLoad} disabled={loading} style={isExpanded ? syncBtn : iconBtn} title="Load">
+            {isExpanded ? (loading ? '...' : 'Load') : '\u{1F4E5}'}
+          </button>
+        </div>
+      </div>
+
+      {/* 맵 요약 숫자 */}
+      {isExpanded ? (
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <span>섬 {data.islands.length}</span>
+          <span>다리 {data.bridges.length}</span>
+          <span>논문 {data.papers.length}</span>
+          <span>갭 {data.gaps.length}</span>
+        </div>
+      ) : (
+        <div style={{ fontSize: '0.6rem', color: 'var(--text-muted)', marginBottom: 8, textAlign: 'center', lineHeight: 1.6 }}>
+          <div>{data.islands.length}</div>
+          <div>{data.papers.length}</div>
+        </div>
+      )}
+
+      {/* Collapsed icons for sections */}
+      {!isExpanded && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', fontSize: '1rem' }}>
+          <span title={`Islands (${data.islands.length})`} style={{ cursor: 'default', opacity: 0.6 }}>{'\u{1F3DD}'}</span>
+          <span title={`Papers (${data.papers.length})`} style={{ cursor: 'default', opacity: 0.6 }}>{'\u{1F4C4}'}</span>
+          <span title={`Gaps (${data.gaps.length})`} style={{ cursor: 'default', opacity: 0.6 }}>{'\u26A0'}</span>
+        </div>
+      )}
+
+      {/* Islands */}
+      {isExpanded && <section>
         <h3 style={sectionTitle}>Islands ({data.islands.length})</h3>
         <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
           {data.islands.map((island) => {
-            const isExpanded = expandedIslands.has(island.id);
+            const isIslandExpanded = expandedIslands.has(island.id);
             return (
               <li key={island.id}>
                 <div
@@ -189,7 +302,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
                     onClick={(e) => { e.stopPropagation(); toggleExpand(island.id); }}
                     style={{ fontSize: '0.65rem', color: 'var(--text-muted)', width: 12, textAlign: 'center', flexShrink: 0, userSelect: 'none' }}
                   >
-                    {island.cities.length > 0 ? (isExpanded ? '\u25BC' : '\u25B6') : '\u00B7'}
+                    {island.cities.length > 0 ? (isIslandExpanded ? '\u25BC' : '\u25B6') : '\u00B7'}
                   </span>
                   <span
                     style={{ width: 10, height: 10, borderRadius: '50%', background: island.color ?? '#8ecae6', flexShrink: 0 }}
@@ -199,7 +312,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
                   </span>
                   <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{island.cities.length}</span>
                 </div>
-                {isExpanded && island.cities.length > 0 && (
+                {isIslandExpanded && island.cities.length > 0 && (
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {island.cities.map((city) => (
                       <li
@@ -227,44 +340,55 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
             );
           })}
         </ul>
-      </section>
+      </section>}
 
-      <section style={{ marginTop: 12 }}>
-        <h3 style={sectionTitle}>Bridges ({data.bridges.length})</h3>
-        {data.bridges.length > 0 && (
-          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {data.bridges.map((bridge) => {
-              const srcName = islandNameMap.get(bridge.sourceIslandId) ?? '?';
-              const tgtName = islandNameMap.get(bridge.targetIslandId) ?? '?';
-              const dirArrow = bridge.direction === 'forward' ? '\u2192' : '\u2190';
-              return (
-                <li
-                  key={bridge.id}
-                  onClick={() => navigate(`${basePath}?bridge=${bridge.id}`)}
+      {/* Papers */}
+      {isExpanded && <section style={{ marginTop: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+          <h3 style={{ ...sectionTitle, marginBottom: 0, flex: 1 }}>Papers ({data.papers.length})</h3>
+          <select
+            value={groupBy}
+            onChange={(e) => setGroupBy(e.target.value as 'none' | 'year' | 'journal')}
+            style={{
+              fontSize: '0.65rem',
+              padding: '1px 4px',
+              border: '1px solid var(--border-input)',
+              borderRadius: 3,
+              background: 'var(--bg-input)',
+              color: 'var(--text-muted)',
+              cursor: 'pointer',
+            }}
+          >
+            <option value="year">연도별</option>
+            <option value="journal">저널별</option>
+            <option value="none">전체</option>
+          </select>
+        </div>
+
+        {/* Year distribution mini bar chart */}
+        {data.papers.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 24, marginBottom: 6 }}>
+            {yearDistribution.entries.map(([year, count]) => (
+              <div key={year} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <div
                   style={{
-                    padding: '3px 8px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-secondary)',
-                    cursor: 'pointer',
-                    borderRadius: 4,
-                    borderLeft: `3px solid ${bridge.color ?? (bridge.direction === 'forward' ? 'var(--accent-forward)' : 'var(--accent-backward)')}`,
-                    marginBottom: 2,
+                    width: '100%',
+                    maxWidth: 20,
+                    height: Math.max(3, (count / yearDistribution.max) * 20),
+                    background: 'var(--accent-forward)',
+                    borderRadius: '2px 2px 0 0',
+                    opacity: 0.7,
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{srcName} {dirArrow} {tgtName}</div>
-                  <div>{bridge.label || '(no label)'}</div>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{bridge.paperIds.length} papers</span>
-                </li>
-              );
-            })}
-          </ul>
+                  title={`${year}: ${count}편`}
+                />
+                <span style={{ fontSize: '0.5rem', color: 'var(--text-muted)', lineHeight: 1 }}>
+                  {String(year).slice(-2)}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
-      </section>
 
-      <section style={{ marginTop: 12 }}>
-        <h3 style={sectionTitle}>Papers ({data.papers.length})</h3>
         <input
           type="text"
           placeholder="Search papers..."
@@ -282,71 +406,87 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
             boxSizing: 'border-box',
           }}
         />
-        <ul style={{ listStyle: 'none', padding: 0 }}>
-          {filteredPapers.map((paper) => (
-            <li
-              key={paper.id}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.setData('application/paper-id', paper.id);
-                e.dataTransfer.effectAllowed = 'copy';
-              }}
-              onClick={() => onHighlightPaper?.(highlightedPaperId === paper.id ? null : paper.id)}
-              style={{
-                padding: '3px 6px',
-                fontSize: '0.8rem',
-                color: highlightedPaperId === paper.id ? 'var(--text-heading)' : 'var(--text-secondary)',
-                background: highlightedPaperId === paper.id ? 'var(--bg-hover)' : 'transparent',
-                borderRadius: 4,
-                cursor: onHighlightPaper ? 'grab' : 'default',
-                fontWeight: highlightedPaperId === paper.id ? 600 : 400,
-                transition: 'all 0.15s',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <span style={{ flex: 1 }}>{paper.title} ({paper.year})</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (confirm(`"${paper.title}" 논문을 삭제할까요?`)) {
-                    ctx.deletePaper(paper.id);
-                  }
-                }}
-                title="논문 삭제"
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.7rem',
-                  color: 'var(--text-muted)',
-                  padding: '0 2px',
-                  flexShrink: 0,
-                  opacity: 0.5,
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#dc3545'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.5'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-              >
-                &#x2715;
-              </button>
-            </li>
-          ))}
-          {searchQuery && filteredPapers.length === 0 && (
-            <li style={{ padding: '4px 6px', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-              No matching papers
-            </li>
-          )}
-        </ul>
-      </section>
 
-      <section style={{ marginTop: 12 }}>
+        {/* Grouped or flat paper list */}
+        {groupedPapers ? (
+          groupedPapers.map(([groupKey, papers]) => {
+            const isGroupCollapsed = collapsedGroups.has(groupKey);
+            return (
+              <div key={groupKey} style={{ marginBottom: 4 }}>
+                <div
+                  onClick={() => toggleGroupCollapse(groupKey)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '3px 6px',
+                    cursor: 'pointer',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: 'var(--text-muted)',
+                    borderRadius: 3,
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  <span style={{ fontSize: '0.6rem', width: 10 }}>{isGroupCollapsed ? '\u25B6' : '\u25BC'}</span>
+                  <span style={{ flex: 1 }}>{groupKey}</span>
+                  <span style={{ fontSize: '0.65rem', fontWeight: 400 }}>{papers.length}</span>
+                </div>
+                {!isGroupCollapsed && (
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                    {papers.map((paper) => (
+                      <PaperItem
+                        key={paper.id}
+                        paper={paper}
+                        highlightedPaperId={highlightedPaperId}
+                        onHighlightPaper={onHighlightPaper}
+                        onSelectPaper={onSelectPaper}
+                        onDelete={() => ctx.deletePaper(paper.id)}
+                        showYear={groupBy !== 'year'}
+                      />
+                    ))}
+                  </ul>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {filteredPapers.map((paper) => (
+              <PaperItem
+                key={paper.id}
+                paper={paper}
+                highlightedPaperId={highlightedPaperId}
+                onHighlightPaper={onHighlightPaper}
+                onSelectPaper={onSelectPaper}
+                onDelete={() => ctx.deletePaper(paper.id)}
+                showYear
+              />
+            ))}
+          </ul>
+        )}
+        {searchQuery && filteredPapers.length === 0 && (
+          <div style={{ padding: '4px 6px', fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>
+            No matching papers
+          </div>
+        )}
+      </section>}
+
+      {/* Research Gaps */}
+      {isExpanded && <section style={{ marginTop: 12 }}>
         <h3 style={sectionTitle}>Research Gaps ({data.gaps.length})</h3>
         {data.gaps.length > 0 && (
           <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
             {data.gaps.map((gap) => (
               <li
                 key={gap.id}
+                onClick={(e) => {
+                  if (onGapAnimate) {
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    onGapAnimate(gap.id, gap.description, rect);
+                  }
+                }}
                 style={{
                   padding: '4px 8px',
                   fontSize: '0.75rem',
@@ -355,6 +495,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
                   borderRadius: 4,
                   borderLeft: '3px solid var(--border-gap)',
                   marginBottom: 3,
+                  cursor: onGapAnimate ? 'pointer' : 'default',
                 }}
               >
                 {gap.description.length > 60 ? gap.description.slice(0, 58) + '...' : gap.description}
@@ -365,10 +506,10 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
             ))}
           </ul>
         )}
-      </section>
+      </section>}
 
-      {/* JSON backup */}
-      <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--border-secondary)' }}>
+      {/* Local Backup */}
+      {isExpanded && <div style={{ marginTop: 'auto', paddingTop: 12, borderTop: '1px solid var(--border-secondary)' }}>
         <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: 4 }}>Local Backup</div>
         <div style={{ display: 'flex', gap: 6 }}>
           <button
@@ -421,100 +562,101 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper }: 
             }}
           />
         </div>
-      </div>
-
-      {/* GitHub sync */}
-      <div style={{ paddingTop: 8, borderTop: '1px solid var(--border-secondary)' }}>
-        {ctx.lastSyncError && (
-          <div
-            style={{
-              padding: '6px 8px',
-              marginBottom: 8,
-              borderRadius: 4,
-              fontSize: '0.75rem',
-              background: '#fff3cd',
-              color: '#856404',
-              border: '1px solid #ffc107',
-            }}
-          >
-            {ctx.lastSyncError}
-            <button
-              onClick={handleLoad}
-              style={{
-                display: 'block',
-                marginTop: 4,
-                padding: '3px 8px',
-                border: '1px solid #856404',
-                borderRadius: 3,
-                background: 'transparent',
-                color: '#856404',
-                cursor: 'pointer',
-                fontSize: '0.7rem',
-              }}
-            >
-              Load로 최신 데이터 가져오기
-            </button>
-          </div>
-        )}
-        {status && (
-          <div
-            style={{
-              padding: '6px 8px',
-              marginBottom: 8,
-              borderRadius: 4,
-              fontSize: '0.8rem',
-              background: status.type === 'success' ? 'var(--bg-status-success)' : 'var(--bg-status-error)',
-              color: status.type === 'success' ? 'var(--text-status-success)' : 'var(--text-status-error)',
-            }}
-          >
-            {status.msg}
-          </div>
-        )}
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={handleSave} disabled={loading} style={syncBtn}>
-            {loading ? '...' : 'Save'}
-          </button>
-          <button onClick={handleLoad} disabled={loading} style={syncBtn}>
-            {loading ? '...' : 'Load'}
-          </button>
-          <button onClick={() => setShowGitHubSettings(true)} style={syncBtn} title="GitHub Settings">
-            Settings
-          </button>
-        </div>
-      </div>
-
-      {/* Sheets sync */}
-      <div style={{ paddingTop: 8, borderTop: '1px solid var(--border-secondary)' }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: 4 }}>Google Sheets</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={handleSheetsPush} disabled={loading} style={syncBtn}>Push</button>
-          <button onClick={handleSheetsPull} disabled={loading} style={syncBtn}>Pull</button>
-          <button onClick={() => setShowSheetsSettings(true)} style={syncBtn} title="Sheets Settings">
-            Settings
-          </button>
-        </div>
-      </div>
-
-      {/* Claude AI */}
-      <div style={{ paddingTop: 8, borderTop: '1px solid var(--border-secondary)' }}>
-        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: 4 }}>Claude AI</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => setShowClaudeSettings(true)} style={syncBtn}>
-            API Settings
-          </button>
-        </div>
-      </div>
+      </div>}
 
       {showGitHubSettings && (
         <GitHubSettings onClose={() => setShowGitHubSettings(false)} />
       )}
-      {showSheetsSettings && (
-        <SheetsSettings onClose={() => setShowSheetsSettings(false)} />
-      )}
-      {showClaudeSettings && (
-        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
-      )}
     </aside>
+  );
+}
+
+/* Extracted paper list item — 3 separate interactions:
+   1. Highlight icon (bulb) click → glow on map
+   2. Title click → open in DetailPanel
+   3. Drag → drop on bridge/road */
+function PaperItem({ paper, highlightedPaperId, onHighlightPaper, onSelectPaper, onDelete, showYear }: {
+  paper: { id: string; title: string; year: number };
+  highlightedPaperId?: string | null;
+  onHighlightPaper?: (paperId: string | null) => void;
+  onSelectPaper?: (paperId: string) => void;
+  onDelete: () => void;
+  showYear: boolean;
+}) {
+  const isHighlighted = highlightedPaperId === paper.id;
+  return (
+    <li
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('application/paper-id', paper.id);
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
+      style={{
+        padding: '3px 6px',
+        fontSize: '0.8rem',
+        color: isHighlighted ? 'var(--text-heading)' : 'var(--text-secondary)',
+        background: isHighlighted ? 'var(--bg-hover)' : 'transparent',
+        borderRadius: 4,
+        cursor: 'grab',
+        fontWeight: isHighlighted ? 600 : 400,
+        transition: 'all 0.15s',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+      }}
+    >
+      {/* Highlight toggle button */}
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onHighlightPaper?.(isHighlighted ? null : paper.id);
+        }}
+        title="맵에서 하이라이트"
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '0.75rem',
+          padding: 0,
+          flexShrink: 0,
+          opacity: isHighlighted ? 1 : 0.4,
+          filter: isHighlighted ? 'none' : 'grayscale(1)',
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; }}
+        onMouseLeave={(e) => { if (!isHighlighted) (e.currentTarget as HTMLElement).style.opacity = '0.4'; }}
+      >
+        {isHighlighted ? '\u{1F4A1}' : '\u{1F4A1}'}
+      </button>
+      {/* Title — click to open in DetailPanel */}
+      <span
+        onClick={() => onSelectPaper?.(paper.id)}
+        style={{ flex: 1, cursor: 'pointer' }}
+      >
+        {paper.title}{showYear ? ` (${paper.year})` : ''}
+      </span>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (confirm(`"${paper.title}" 논문을 삭제할까요?`)) onDelete();
+        }}
+        title="논문 삭제"
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          fontSize: '0.7rem',
+          color: 'var(--text-muted)',
+          padding: '0 2px',
+          flexShrink: 0,
+          opacity: 0.5,
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.opacity = '1'; (e.currentTarget as HTMLElement).style.color = '#dc3545'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.opacity = '0.5'; (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+      >
+        &#x2715;
+      </button>
+    </li>
   );
 }
 
@@ -523,6 +665,21 @@ const sectionTitle: React.CSSProperties = {
   color: 'var(--text-tertiary)',
   fontWeight: 600,
   marginBottom: 4,
+};
+
+const iconBtn: React.CSSProperties = {
+  width: 36,
+  height: 30,
+  border: '1px solid var(--btn-secondary-border)',
+  borderRadius: 4,
+  background: 'var(--btn-secondary-bg)',
+  color: 'var(--text-primary)',
+  cursor: 'pointer',
+  fontSize: '0.9rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: 0,
 };
 
 const syncBtn: React.CSSProperties = {

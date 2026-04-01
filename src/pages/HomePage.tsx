@@ -11,6 +11,8 @@ import type { MapMeta, MapsIndex } from '../services/mapIndexService';
 import { generateId } from '../utils/idGenerator';
 import { useThemeContext } from '../contexts/ThemeContext';
 import GitHubSettings from '../components/GitHubSettings';
+import SheetsSettings from '../components/SheetsSettings';
+import ClaudeSettings from '../components/ClaudeSettings';
 import PinDialog from '../components/PinDialog';
 import NewMapDialog from '../components/NewMapDialog';
 
@@ -21,6 +23,8 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showGitHubSettings, setShowGitHubSettings] = useState(false);
+  const [showSheetsSettings, setShowSheetsSettings] = useState(false);
+  const [showClaudeSettings, setShowClaudeSettings] = useState(false);
   const [showNewMap, setShowNewMap] = useState(false);
   const [pinTarget, setPinTarget] = useState<MapMeta | null>(null);
   const [pinError, setPinError] = useState<string | null>(null);
@@ -294,20 +298,25 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Settings link */}
-          <div style={{ textAlign: 'center' }}>
+          {/* Settings */}
+          <div style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', gap: 16 }}>
             <button
               onClick={() => setShowGitHubSettings(true)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-muted)',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                textDecoration: 'underline',
-              }}
+              style={settingsLink}
             >
-              GitHub Settings
+              GitHub
+            </button>
+            <button
+              onClick={() => setShowSheetsSettings(true)}
+              style={settingsLink}
+            >
+              Google Sheets
+            </button>
+            <button
+              onClick={() => setShowClaudeSettings(true)}
+              style={settingsLink}
+            >
+              Claude AI
             </button>
           </div>
         </div>
@@ -321,6 +330,12 @@ export default function HomePage() {
             loadIndex();
           }}
         />
+      )}
+      {showSheetsSettings && (
+        <SheetsSettings onClose={() => setShowSheetsSettings(false)} />
+      )}
+      {showClaudeSettings && (
+        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
       )}
       {showNewMap && (
         <NewMapDialog
@@ -339,3 +354,12 @@ export default function HomePage() {
     </div>
   );
 }
+
+const settingsLink: React.CSSProperties = {
+  background: 'none',
+  border: 'none',
+  color: 'var(--text-muted)',
+  cursor: 'pointer',
+  fontSize: '0.8rem',
+  textDecoration: 'underline',
+};
