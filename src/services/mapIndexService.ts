@@ -1,4 +1,4 @@
-import { getGitHubConfig } from './githubService';
+import { getGitHubConfig, base64ToUtf8, utf8ToBase64 } from './githubService';
 import type { GitHubConfig } from './githubService';
 
 const INDEX_PATH = 'data/maps-index.json';
@@ -40,12 +40,12 @@ export async function loadMapsIndex(config: GitHubConfig): Promise<MapsIndex> {
   if (res.status === 404) return { maps: [] };
   if (!res.ok) throw new Error(`Failed to load maps index: ${res.status}`);
   const data = await res.json();
-  const decoded = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+  const decoded = base64ToUtf8(data.content.replace(/\n/g, ''));
   return JSON.parse(decoded) as MapsIndex;
 }
 
 export async function saveMapsIndex(config: GitHubConfig, index: MapsIndex): Promise<void> {
-  const content = btoa(unescape(encodeURIComponent(JSON.stringify(index, null, 2))));
+  const content = utf8ToBase64(JSON.stringify(index, null, 2));
   const sha = await getFileSha(config, INDEX_PATH);
 
   const body: Record<string, string> = {

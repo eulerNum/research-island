@@ -37,15 +37,36 @@ async function getFileSha(
   return data.sha as string;
 }
 
+/** Encode a UTF-8 string to base64, handling large payloads safely. */
+export function utf8ToBase64(str: string): string {
+  const bytes = new TextEncoder().encode(str);
+  // Build binary string in chunks to avoid call-stack overflow on large data
+  const CHUNK = 8192;
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+/** Decode a base64 string to UTF-8, handling large payloads safely. */
+export function base64ToUtf8(b64: string): string {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
+}
+
 export async function saveToGitHub(
   config: GitHubConfig,
   map: ResearchMap,
   mapId?: string,
 ): Promise<void> {
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
-  const content = btoa(
-    unescape(encodeURIComponent(JSON.stringify(map, null, 2))),
-  );
+  const jsonStr = JSON.stringify(map, null, 2);
+  const content = utf8ToBase64(jsonStr);
   const sha = await getFileSha(config, filePath);
 
   const body: Record<string, string> = {
@@ -82,7 +103,25 @@ export async function loadFromGitHub(
   );
   if (!res.ok) throw new Error(`GitHub load failed: ${res.status}`);
   const data = await res.json();
-  const decoded = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+
+  // GitHub Contents API returns content: null for files > 1MB.
+  // In that case, download via the raw download_url or git blob API.
+  if (!data.content && data.download_url) {
+    const rawRes = await fetch(data.download_url, {
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
+    if (!rawRes.ok) throw new Error(`GitHub raw download failed: ${rawRes.status}`);
+    const text = await rawRes.text();
+    if (!text) throw new Error('GitHub returned empty file content');
+    return JSON.parse(text) as ResearchMap;
+  }
+
+  if (!data.content) {
+    throw new Error('GitHub returned no file content (file may be too large or empty)');
+  }
+
+  const decoded = base64ToUtf8(data.content.replace(/\n/g, ''));
+  if (!decoded) throw new Error('Decoded content is empty');
   return JSON.parse(decoded) as ResearchMap;
 }
 

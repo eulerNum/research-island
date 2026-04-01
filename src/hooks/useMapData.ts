@@ -386,22 +386,34 @@ export function useMapData(mapId?: string) {
     refresh();
   }, [refresh, effectiveMapId]);
 
-  // Auto-save to GitHub (30s debounce after any data mutation)
+  // Auto-save to GitHub (5s debounce after any data mutation)
+  const flushSave = useCallback(async () => {
+    if (!effectiveMapId) return;
+    const config = githubService.getGitHubConfig();
+    if (!config) return;
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+      autoSaveTimerRef.current = null;
+    }
+    try {
+      const data = mapService.getFullMap();
+      await githubService.saveToGitHub(config, data, effectiveMapId);
+      setLastSyncError(null);
+    } catch (e) {
+      setLastSyncError((e as Error).message);
+    }
+  }, [effectiveMapId]);
+
   const scheduleAutoSave = useCallback(() => {
     if (!effectiveMapId) return;
     const config = githubService.getGitHubConfig();
     if (!config) return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    autoSaveTimerRef.current = setTimeout(async () => {
-      try {
-        const data = mapService.getFullMap();
-        await githubService.saveToGitHub(config, data, effectiveMapId);
-        setLastSyncError(null);
-      } catch (e) {
-        setLastSyncError((e as Error).message);
-      }
-    }, 30_000);
-  }, [effectiveMapId]);
+    autoSaveTimerRef.current = setTimeout(() => {
+      autoSaveTimerRef.current = null;
+      flushSave();
+    }, 5_000);
+  }, [effectiveMapId, flushSave]);
 
   // Trigger auto-save when mapData changes (skip initial load)
   const isInitialLoad = useRef(true);
@@ -414,16 +426,23 @@ export function useMapData(mapId?: string) {
     scheduleAutoSave();
   }, [mapData, scheduleAutoSave]);
 
-  // Save immediately when leaving the page
+  // Save when tab becomes hidden (more reliable than beforeunload on mobile)
   useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        flushSave();
+      }
+    };
     const handleBeforeUnload = () => {
       if (!effectiveMapId) return;
       // Save to localStorage as fallback so data isn't lost
       const data = mapService.getFullMap();
       localStorage.setItem(`pending-save-${effectiveMapId}`, JSON.stringify(data));
     };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
       // Flush pending auto-save on unmount (navigating away)
       if (autoSaveTimerRef.current) {
@@ -438,7 +457,7 @@ export function useMapData(mapId?: string) {
         }
       }
     };
-  }, [effectiveMapId]);
+  }, [effectiveMapId, flushSave]);
 
   // ─── Undo / Redo ────────────────────────────────────────
 
