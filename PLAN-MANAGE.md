@@ -1,6 +1,6 @@
 # Research Island Map — 멀티맵 관리 시스템 설계서
 
-인터뷰 기반 (2026-03-31)
+인터뷰 기반 (2026-03-31) / 최종 업데이트 (2026-04-01)
 
 ---
 
@@ -42,10 +42,9 @@ data/
 ├── maps-index.json              ← 맵 목록 (이름, 설명, PIN 해시, 통계, 생성일)
 ├── maps/
 │   ├── {mapId}.json             ← 각 맵의 ResearchMap 데이터
-│   ├── {mapId}.json
 │   └── ...
 └── figures/
-    ├── {paperId}_0.png          ← Figure 이미지 (기존과 동일)
+    ├── {paperId}_0.png          ← Figure 이미지
     └── ...
 ```
 
@@ -57,21 +56,17 @@ data/
       "id": "abc123",
       "name": "박사논문 맵",
       "description": "관능과학 선행연구 정리",
-      "pinHash": "03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4",
+      "pinHash": "03ac674216f3e15c...",
       "createdAt": "2026-03-31T10:00:00Z",
       "updatedAt": "2026-03-31T15:30:00Z",
-      "stats": {
-        "islands": 5,
-        "bridges": 8,
-        "papers": 23
-      }
+      "stats": { "islands": 5, "bridges": 8, "papers": 23 }
     }
   ]
 }
 ```
 
 ### PIN 저장 방식
-- SHA-256 해시로 저장 (평문 저장 ❌)
+- SHA-256 해시로 저장 (평문 저장 X)
 - 4자리 숫자 (0000~9999)
 - 검증: 입력값 해시 === 저장된 해시 비교
 - 목적: 간단한 잠금 (보안 등급 아님)
@@ -81,178 +76,94 @@ data/
 ## 4. 접속 흐름
 
 ```
-┌──────────────────────────────────────────────┐
-│  홈페이지 (/)                                 │
-│                                              │
-│  ┌─ GitHub PAT 미설정 시 ──────────────────┐  │
-│  │  "GitHub 연결 필요" + Settings 버튼      │  │
-│  │  PAT + owner + repo 입력 (기기당 1회)    │  │
-│  └─────────────────────────────────────────┘  │
-│                                              │
-│  ┌─ PAT 설정 완료 시 ─────────────────────┐  │
-│  │  맵 목록 카드                           │  │
-│  │  ┌─────────────┐  ┌─────────────┐      │  │
-│  │  │ 박사논문 맵  │  │ 학회발표 맵  │      │  │
-│  │  │ 섬 5 · 논문23│  │ 섬 3 · 논문12│      │  │
-│  │  │ 2026-03-31  │  │ 2026-03-20  │      │  │
-│  │  └──── 클릭 ───┘  └──── 클릭 ───┘      │  │
-│  │                                         │  │
-│  │  [+ 새 맵 만들기]                        │  │
-│  └─────────────────────────────────────────┘  │
-└──────────────────────────────────────────────┘
-                    │
-                    ▼ (맵 클릭)
-┌──────────────────────────────────────────────┐
-│  PIN 입력 다이얼로그                          │
-│  "박사논문 맵에 접속합니다"                    │
-│  [____] 4자리 PIN 입력                       │
-│  [확인] [취소]                                │
-└──────────────────────────────────────────────┘
-                    │
-                    ▼ (PIN 일치)
-┌──────────────────────────────────────────────┐
-│  기존 맵 뷰 (/map/:mapId)                    │
-│  Toolbar + Sidebar + IslandMap + DetailPanel │
-│  (현재와 동일한 인터페이스)                    │
-└──────────────────────────────────────────────┘
+홈페이지 (/)
+├── GitHub PAT 미설정 → Settings 버튼 → PAT+owner+repo 입력 (기기당 1회)
+└── PAT 설정 완료 → 맵 목록 카드 표시
+    ├── 맵 클릭 → PIN 입력 → 맵 뷰 (/map/:mapId)
+    └── [+ 새 맵 만들기] → 이름+설명+PIN → 생성 후 바로 진입
 ```
 
 ---
 
-## 5. 라우트 구조 변경
+## 5. 라우트 구조 ✅ (구현 완료)
 
-### 현재
-```
-/                  → OverviewPage (섬 조망도)
-/island/:id        → IslandDetailPage (섬 내부)
-```
-
-### 변경 후
 ```
 /                          → HomePage (맵 목록 + GitHub 설정)
-/map/:mapId                → OverviewPage (섬 조망도)
+/map/:mapId                → MapWrapper → OverviewPage (섬 조망도)
 /map/:mapId/island/:id     → IslandDetailPage (섬 내부)
 ```
 
 ---
 
-## 6. 새 맵 만들기
+## 6. GitHub 동기화 전략 ✅ (구현 완료 + 강화)
 
-### 입력 항목
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| 이름 | ✅ | 맵 제목 (예: "박사논문 맵") |
-| 설명 | 선택 | 간단한 설명 |
-| PIN | ✅ | 4자리 숫자 비밀번호 |
+### 자동 저장
+- 변경 발생 → localStorage 즉시 저장 + **5초 디바운스** GitHub auto-sync
+- `visibilitychange` 이벤트: 탭 숨김 → 즉시 GitHub 저장
+- 맵 나가기(홈 이동) 시 미저장 데이터 자동 sync
 
-### 생성 시 동작
-1. 빈 ResearchMap 생성 (`{ islands: [], bridges: [], roads: [], papers: [], gaps: [] }`)
-2. `data/maps/{newId}.json`에 저장 (GitHub API)
-3. `data/maps-index.json`에 메타데이터 추가
-4. 생성 후 바로 해당 맵으로 이동
+### 자동 로드
+- 맵 진입 시 GitHub에서 최신 데이터 자동 로드
+- `visibilitychange` 이벤트: 탭 복귀 → GitHub에서 최신 로드 (다른 기기 변경분 반영)
+
+### 충돌 감지 (1단계) ✅
+- 파일별 SHA 추적 (`knownShaMap`)
+- 저장 시 원격 SHA 비교 → 불일치 시 `ConflictError`
+- 수동 Save: confirm 다이얼로그 (덮어쓰기 / 취소)
+- auto-save: 사이드바 경고 배너 + "Load로 최신 데이터 가져오기" 버튼
+
+### 캐시 우회
+- URL `?t=Date.now()` 타임스탬프 (browser cache 무효화)
+- **절대 사용 금지**: `cache: 'no-store'`, `If-None-Match` 헤더 (CORS 실패 유발)
+
+### 대용량 파일 (>1MB)
+- GitHub Contents API는 1MB 초과 시 `content: null` 반환
+- Git Blob API (`/git/blobs/{sha}`)로 fallback
+- **절대 사용 금지**: `raw.githubusercontent.com` + Authorization (CORS 차단)
+
+### Base64 인코딩
+- `TextEncoder`/`TextDecoder` 기반 `utf8ToBase64`/`base64ToUtf8`
+- **절대 사용 금지**: `btoa(unescape(encodeURIComponent(...)))` (큰 payload 깨짐)
 
 ---
 
-## 7. 주요 컴포넌트 변경
+## 7. 주요 컴포넌트 ✅ (구현 완료)
 
-### 신규
+### 신규 (구현됨)
 - `src/pages/HomePage.tsx` — 맵 목록 + GitHub 설정 + 맵 생성
-- `src/services/mapIndexService.ts` — maps-index.json CRUD (GitHub API 경유)
+- `src/pages/MapWrapper.tsx` — mapId별 MapDataContext 제공
+- `src/services/mapIndexService.ts` — maps-index.json CRUD
 - `src/components/PinDialog.tsx` — PIN 입력 모달
-- `src/components/MapCard.tsx` — 맵 카드 (이름, 통계, 날짜)
 - `src/components/NewMapDialog.tsx` — 새 맵 생성 모달
 
-### 수정
+### 수정됨
 - `src/App.tsx` — 라우트 구조 변경
-- `src/services/githubService.ts` — 맵별 파일 경로 지원 (`data/maps/{mapId}.json`)
-- `src/services/mapService.ts` — localStorage 키에 mapId 포함 (`research-map-{mapId}`)
-- `src/hooks/useMapData.ts` — mapId 파라미터 추가
-- `src/pages/OverviewPage.tsx` — 라우트 파라미터 변경
-- `src/pages/IslandDetailPage.tsx` — 라우트 파라미터 변경
-- `src/components/Sidebar.tsx` — 홈으로 돌아가기 버튼 추가
+- `src/services/githubService.ts` — mapId별 경로 + Blob API + SHA 충돌 감지
+- `src/services/mapService.ts` — activeMapId 기반 localStorage 키 분리
+- `src/hooks/useMapData.ts` — mapId + auto-sync + visibilitychange + 충돌 감지
 
 ---
 
-## 8. 데이터 흐름 변경
+## 8. 미구현 항목
 
-### 현재
-```
-앱 시작 → localStorage('research-island-map') 로드 → 사용
-Save 클릭 → GitHub data/research-map.json 저장
-```
+### Phase B (남은 작업)
+- [ ] 기존 단일맵 데이터 마이그레이션 다이얼로그 (`mapService.hasLegacyData()` 구현됨, UI 미연결)
+- [ ] 맵 삭제 기능 (HomePage에서)
+- [ ] 맵 이름/설명/PIN 수정 기능
 
-### 변경 후
-```
-홈 접속 → GitHub data/maps-index.json 로드 → 맵 목록 표시
-맵 선택 + PIN → GitHub data/maps/{mapId}.json 로드 → localStorage 캐시 → 사용
-자동저장/Save → GitHub data/maps/{mapId}.json + maps-index.json 통계 업데이트
-```
-
-### 자동 저장 전략
-- 변경 발생 시 **localStorage에 즉시 저장** (기존과 동일, 빠름)
-- **30초 디바운스**로 GitHub에 자동 sync (네트워크 비용 최소화)
-- 사이드바의 Save 버튼은 즉시 GitHub sync (수동 트리거)
-- 맵 나가기(홈 이동) 시 미저장 데이터가 있으면 자동 sync
+### 충돌 감지 2단계 (미래)
+- [ ] 자동 병합 (추가된 것은 합치고, 삭제/수정은 확인)
+- [ ] WebSocket 실시간 동기화 (Google Docs 스타일) — 복잡도 높아 당분간 불필요
 
 ---
 
-## 9. 기존 데이터 마이그레이션
+## 9. 디버깅 워크플로우
 
-현재 localStorage에 있는 단일 맵 데이터를 자동으로 멀티맵 구조로 전환:
+유저에게 에러 발생 시:
 
-1. 앱 시작 시 `localStorage('research-island-map')` 확인
-2. 존재하면 → "기존 맵 데이터가 있습니다. 새 맵으로 가져올까요?" 다이얼로그
-3. 이름/설명/PIN 입력 → 새 맵으로 생성 + GitHub 업로드
-4. 마이그레이션 완료 후 기존 localStorage 키 제거
+1. **F12** → Console 탭 열기
+2. 빨간색 에러 메시지 **전문** 복사 (요약 X, 전문 O)
+3. Network 탭에서 실패한 요청의 **Status**, **URL**, **Response** 확인
+4. 위 정보를 그대로 전달
 
----
-
-## 10. 성능 고려사항
-
-### Figure 이미지 (적극 사용 예정)
-- GitHub Contents API: 파일당 **최대 100MB**
-- 현재 base64로 JSON 내 저장 → **GitHub `data/figures/`에 분리 저장** (이미 구현됨)
-- 맵 JSON에는 URL만 참조 → 로딩 속도 영향 없음
-
-### 맵 데이터 크기 예상
-- 논문 100개 × 0.5KB ≈ 50KB
-- 섬/다리/도시/도로 메타데이터 ≈ 20KB
-- 맵당 약 70~100KB (Figure 제외)
-- 2~3개 맵: 총 300KB 이하 → **문제 없음**
-
-### 네트워크 최적화
-- GitHub API 호출 최소화 (디바운스)
-- localStorage를 로컬 캐시로 활용
-- 변경 없으면 sync 건너뜀
-
----
-
-## 11. 구현 우선순위
-
-### Phase A: 멀티맵 홈페이지 (핵심)
-1. HomePage + 라우트 구조 변경
-2. mapIndexService (maps-index.json CRUD)
-3. githubService 맵별 경로 지원
-4. PIN 입력 다이얼로그
-5. 새 맵 생성 다이얼로그
-6. mapService 멀티맵 지원 (mapId별 localStorage 키)
-
-### Phase B: 자동 저장 + 마이그레이션
-7. GitHub 자동 sync (30초 디바운스)
-8. 기존 단일맵 데이터 마이그레이션
-9. 맵 삭제 기능
-10. 맵 이름/설명/PIN 수정 기능
-
-### Phase C: Vercel 배포
-11. Vercel 연결 + 첫 배포
-12. 배포 후 실기기 테스트
-
----
-
-## 12. 검증 방법
-
-1. `npm run build && npx tsc --noEmit` — 빌드 통과
-2. 로컬에서 전체 플로우 테스트:
-   - 홈 → GitHub 설정 → 맵 생성 → PIN 입력 → 맵 사용 → 홈으로 복귀
-   - 다른 브라우저에서 같은 맵 접속 (localStorage 없이 GitHub에서 로드)
-3. Vercel 배포 후 다른 기기에서 접속 테스트
+> "failed to fetch"만으로는 원인 파악 불가. CORS policy, status code, URL 등 상세 정보가 핵심.
