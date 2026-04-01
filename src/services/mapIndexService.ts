@@ -23,8 +23,8 @@ export interface MapsIndex {
 
 async function getFileSha(config: GitHubConfig, path: string): Promise<string | null> {
   const res = await fetch(
-    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}`,
-    { headers: { Authorization: `Bearer ${config.token}`, 'If-None-Match': '' } },
+    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}?t=${Date.now()}`,
+    { headers: { Authorization: `Bearer ${config.token}` } },
   );
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
@@ -34,8 +34,8 @@ async function getFileSha(config: GitHubConfig, path: string): Promise<string | 
 
 export async function loadMapsIndex(config: GitHubConfig): Promise<MapsIndex> {
   const res = await fetch(
-    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${INDEX_PATH}`,
-    { headers: { Authorization: `Bearer ${config.token}`, 'If-None-Match': '' } },
+    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${INDEX_PATH}?t=${Date.now()}`,
+    { headers: { Authorization: `Bearer ${config.token}` } },
   );
   if (res.status === 404) return { maps: [] };
   if (!res.ok) throw new Error(`Failed to load maps index: ${res.status}`);

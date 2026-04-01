@@ -18,6 +18,11 @@ function mapFilePath(mapId: string): string {
   return `data/maps/${mapId}.json`;
 }
 
+/** GitHub contents API URL with cache-busting timestamp */
+function contentsUrl(config: GitHubConfig, path: string): string {
+  return `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}?t=${Date.now()}`;
+}
+
 export interface GitHubConfig {
   token: string;
   owner: string;
@@ -38,15 +43,9 @@ async function getFileSha(
   config: GitHubConfig,
   path: string,
 ): Promise<string | null> {
-  const res = await fetch(
-    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${path}`,
-    {
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'If-None-Match': '',  // bypass browser cache
-      },
-    },
-  );
+  const res = await fetch(contentsUrl(config, path), {
+    headers: { Authorization: `Bearer ${config.token}` },
+  });
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub API error: ${res.status}`);
   const data = await res.json();
@@ -110,17 +109,14 @@ export async function saveToGitHub(
 
   let res: Response;
   try {
-    res = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
+    res = await fetch(contentsUrl(config, filePath), {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify(body),
+    });
   } catch {
     throw new Error('GitHub 저장 실패 — 네트워크를 확인하세요.');
   }
@@ -143,15 +139,9 @@ export async function loadFromGitHub(
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
   let res: Response;
   try {
-    res = await fetch(
-      `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
-      {
-        headers: {
-          Authorization: `Bearer ${config.token}`,
-          'If-None-Match': '',  // bypass browser cache
-        },
-      },
-    );
+    res = await fetch(contentsUrl(config, filePath), {
+      headers: { Authorization: `Bearer ${config.token}` },
+    });
   } catch {
     throw new Error('GitHub 로드 실패 — 네트워크를 확인하세요.');
   }
@@ -164,15 +154,17 @@ export async function loadFromGitHub(
   }
 
   // GitHub Contents API returns content: null for files > 1MB.
-  // In that case, download via the raw download_url or git blob API.
-  if (!data.content && data.download_url) {
-    const rawRes = await fetch(data.download_url, {
-      headers: { Authorization: `Bearer ${config.token}` },
-    });
-    if (!rawRes.ok) throw new Error(`GitHub raw download failed: ${rawRes.status}`);
-    const text = await rawRes.text();
-    if (!text) throw new Error('GitHub returned empty file content');
-    return JSON.parse(text) as ResearchMap;
+  // Use Git Blob API instead (raw.githubusercontent.com doesn't support CORS with auth).
+  if (!data.content && data.sha) {
+    const blobRes = await fetch(
+      `https://api.github.com/repos/${config.owner}/${config.repo}/git/blobs/${data.sha}?t=${Date.now()}`,
+      { headers: { Authorization: `Bearer ${config.token}` } },
+    );
+    if (!blobRes.ok) throw new Error(`GitHub blob download failed: ${blobRes.status}`);
+    const blob = await blobRes.json();
+    const decoded = base64ToUtf8(blob.content.replace(/\n/g, ''));
+    if (!decoded) throw new Error('Decoded blob content is empty');
+    return JSON.parse(decoded) as ResearchMap;
   }
 
   if (!data.content) {
@@ -191,16 +183,13 @@ export async function deleteFromGitHub(
   const filePath = mapFilePath(mapId);
   const sha = await getFileSha(config, filePath);
   if (!sha) return;
-  const res = await fetch(
-    `https://api.github.com/repos/${config.owner}/${config.repo}/contents/${filePath}`,
-    {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${config.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ message: `Delete map ${mapId}`, sha }),
+  const res = await fetch(contentsUrl(config, filePath), {
+    method: 'DELETE',
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      'Content-Type': 'application/json',
     },
-  );
+    body: JSON.stringify({ message: `Delete map ${mapId}`, sha }),
+  });
   if (!res.ok) throw new Error(`GitHub delete failed: ${res.status}`);
 }
