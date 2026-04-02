@@ -1,3 +1,4 @@
+// v2 — AI chat + deep search
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeContext } from './contexts/ThemeContext';
 import { useTheme } from './hooks/useTheme';
