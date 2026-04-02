@@ -95,22 +95,25 @@ data/
 
 ---
 
-## 6. GitHub 동기화 전략 ✅ (구현 완료 + 강화)
+## 6. GitHub 동기화 전략 ✅ (구현 완료, auto-save 제거)
 
-### 자동 저장
-- 변경 발생 → localStorage 즉시 저장 + **5초 디바운스** GitHub auto-sync
-- `visibilitychange` 이벤트: 탭 숨김 → 즉시 GitHub 저장
-- 맵 나가기(홈 이동) 시 미저장 데이터 자동 sync
+### 저장 방식 (수동)
+- 변경 발생 → localStorage 즉시 저장 (브라우저 내 데이터 보호)
+- GitHub 저장은 **수동 Save 버튼**으로만 실행
+- ~~auto-save 제거됨~~ — git 히스토리 오염 + Vercel 빌드 충돌 방지
 
 ### 자동 로드
 - 맵 진입 시 GitHub에서 최신 데이터 자동 로드
 - `visibilitychange` 이벤트: 탭 복귀 → GitHub에서 최신 로드 (다른 기기 변경분 반영)
 
+### Vercel 배포 보호
+- `vercel.json` `ignoreCommand`: `data/` 전용 커밋 시 빌드 스킵
+- 코드 변경이 포함된 커밋만 Vercel 빌드 트리거
+
 ### 충돌 감지 (1단계) ✅
 - 파일별 SHA 추적 (`knownShaMap`)
 - 저장 시 원격 SHA 비교 → 불일치 시 `ConflictError`
 - 수동 Save: confirm 다이얼로그 (덮어쓰기 / 취소)
-- auto-save: 사이드바 경고 배너 + "Load로 최신 데이터 가져오기" 버튼
 
 ### 캐시 우회
 - URL `?t=Date.now()` 타임스탬프 (browser cache 무효화)

@@ -337,6 +337,7 @@ export default function OverviewPage() {
               const actualId = ctx.addPaper(paper);
               ctx.addPaperToBridge(actualId, selectedBridge.id);
             }}
+            onAddPaperWithId={(paper) => ctx.addPaper(paper)}
             onUpdatePaper={ctx.updatePaper}
             onRemovePaper={(paperId) => ctx.removePaperFromBridge(paperId, selectedBridge.id)}
             onDeletePaper={ctx.deletePaper}
@@ -348,6 +349,8 @@ export default function OverviewPage() {
             onHighlightPaper={setHighlightedPaperId}
             onNavigateToBridge={handleNavigateToBridge}
             onNavigateToRoad={handleNavigateToRoad}
+            onAddPaperToBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
+            onAddPaperToRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
             onClose={() => { setSelectedBridgeId(null); setHighlightedPaperId(null); }}
           />
         )}

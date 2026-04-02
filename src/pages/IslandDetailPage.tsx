@@ -299,6 +299,7 @@ export default function IslandDetailPage() {
               const actualId = ctx.addPaper(paper);
               ctx.addPaperToRoad(actualId, selectedRoad.id);
             }}
+            onAddPaperWithId={(paper) => ctx.addPaper(paper)}
             onUpdatePaper={ctx.updatePaper}
             onRemovePaper={(paperId) => ctx.removePaperFromRoad(paperId, selectedRoad.id)}
             onDeletePaper={ctx.deletePaper}
@@ -310,6 +311,8 @@ export default function IslandDetailPage() {
             onHighlightPaper={setHighlightedPaperId}
             onNavigateToBridge={handleNavigateToBridge}
             onNavigateToRoad={handleNavigateToRoad}
+            onAddPaperToBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
+            onAddPaperToRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
             onClose={() => { setSelectedRoadId(null); setHighlightedPaperId(null); }}
           />
         )}

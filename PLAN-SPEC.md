@@ -245,12 +245,13 @@ GitHub Repository (data/)
 └── figures/{paperId}_0.png  ← 논문 Figure 이미지
 ```
 
-### 동기화 방식 (구현 완료)
-- **자동 저장**: 5초 디바운스 + visibilitychange 즉시 저장
+### 동기화 방식 (구현 완료, auto-save 제거됨)
+- **수동 저장**: Save 버튼 클릭 시에만 GitHub에 push (auto-save 제거됨)
 - **자동 로드**: 맵 진입 시 + 탭 복귀 시 GitHub에서 최신 로드
+- **localStorage**: 변경 즉시 저장 (브라우저 내 데이터 보호)
 - **충돌 감지**: SHA 비교 → 충돌 시 경고 + 선택
-- **수동**: Save/Load 버튼 (사이드바)
 - **캐시 우회**: URL `?t=timestamp`
+- **Vercel ignoreCommand**: `data/` 전용 커밋 빌드 스킵
 - 상세: PLAN-MANAGE.md § 6 참조
 
 ### 구글시트 연동 ✅ (기본 구현)

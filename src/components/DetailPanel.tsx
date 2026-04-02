@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import type { Bridge, Road, Paper, ResearchGap } from '../services/types';
 import { getClaudeConfig, suggestPapers } from '../services/aiService';
 import type { AISuggestion } from '../services/aiService';
@@ -9,6 +9,7 @@ import GapMemo from './GapMemo';
 import PaperForm from './PaperForm';
 import FigureLightbox from './FigureLightbox';
 import ClaudeSettings from './ClaudeSettings';
+import AIChatPanel from './AIChatPanel';
 
 interface CrossRef {
   type: 'bridge' | 'road';
@@ -32,6 +33,7 @@ interface DetailPanelProps {
   sourceLabel?: string; // source island/city name for AI prompt
   targetLabel?: string; // target island/city name for AI prompt
   onAddPaper: (paper: Paper) => void;
+  onAddPaperWithId?: (paper: Paper) => string; // returns actual (deduped) paper ID
   onUpdatePaper?: (paper: Paper) => void;
   onAddGap: (gap: ResearchGap) => void;
   onDeleteGap: (gapId: string) => void;
@@ -40,6 +42,8 @@ interface DetailPanelProps {
   onHighlightPaper?: (paperId: string | null) => void;
   onNavigateToBridge?: (bridgeId: string) => void;
   onNavigateToRoad?: (roadId: string, islandId: string) => void;
+  onAddPaperToBridge?: (paperId: string, bridgeId: string) => void;
+  onAddPaperToRoad?: (paperId: string, roadId: string) => void;
   onClose: () => void;
 }
 
@@ -57,6 +61,7 @@ export default function DetailPanel({
   sourceLabel,
   targetLabel,
   onAddPaper,
+  onAddPaperWithId,
   onUpdatePaper,
   onAddGap,
   onDeleteGap,
@@ -65,6 +70,8 @@ export default function DetailPanel({
   onHighlightPaper,
   onNavigateToBridge,
   onNavigateToRoad,
+  onAddPaperToBridge,
+  onAddPaperToRoad,
   onClose,
 }: DetailPanelProps) {
   const [showPaperForm, setShowPaperForm] = useState(false);
@@ -75,6 +82,33 @@ export default function DetailPanel({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showClaudeSettings, setShowClaudeSettings] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(420);
+  const [chatExpanded, setChatExpanded] = useState(false);
+  const resizingRef = useRef(false);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = startX - ev.clientX;
+      setPanelWidth(Math.max(360, Math.min(800, startWidth + delta)));
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
 
   const entity = bridge ?? road;
   const paperIds = entity?.paperIds ?? [];
@@ -106,6 +140,25 @@ export default function DetailPanel({
     return map;
   }, [linkedPapers, allBridges, allRoads, allIslandCityMap, islandNameMap, cityNameMap, bridge, road]);
 
+  // Build bridge/road label lists for AI chat context
+  const chatBridgeList = useMemo(() =>
+    allBridges.map((b) => ({
+      id: b.id,
+      sourceLabel: islandNameMap?.get(b.sourceIslandId) ?? '?',
+      targetLabel: islandNameMap?.get(b.targetIslandId) ?? '?',
+      label: b.label ?? '',
+    })),
+  [allBridges, islandNameMap]);
+
+  const chatRoadList = useMemo(() =>
+    allRoads.map((r) => ({
+      id: r.id,
+      sourceLabel: cityNameMap?.get(r.sourceCityId) ?? '?',
+      targetLabel: cityNameMap?.get(r.targetCityId) ?? '?',
+      label: r.label ?? '',
+    })),
+  [allRoads, cityNameMap]);
+
   if (!entity) return null;
 
   const gapIds = entity.gapIds;
@@ -128,18 +181,35 @@ export default function DetailPanel({
   return (
     <aside
       style={{
-        width: 360,
+        width: panelWidth,
         borderLeft: '1px solid var(--border-secondary)',
         background: 'var(--bg-primary)',
-        overflowY: 'auto',
-        padding: '16px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 16,
         flexShrink: 0,
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          cursor: 'col-resize',
+          zIndex: 10,
+          background: 'transparent',
+        }}
+        onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--accent-forward)'; }}
+        onMouseLeave={(e) => { if (!resizingRef.current) (e.target as HTMLElement).style.background = 'transparent'; }}
+      />
+
       {/* Header */}
+      <div style={{ padding: '16px 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <h3 style={{ fontSize: '1rem', margin: 0 }}>
           <span style={{ color: dirColor }}>{entity.direction === 'forward' ? '\u2192' : '\u2190'}</span>{' '}
@@ -158,6 +228,37 @@ export default function DetailPanel({
           &times;
         </button>
       </div>
+      </div>
+
+      {/* AI Chat Panel — top of sidebar */}
+      {onAddPaperWithId && onAddPaperToBridge && onAddPaperToRoad && onUpdatePaper && (
+        <AIChatPanel
+          entity={entity}
+          entityType={bridge ? 'bridge' : 'road'}
+          sourceLabel={sourceLabel ?? 'Source'}
+          targetLabel={targetLabel ?? 'Target'}
+          existingPapers={linkedPapers}
+          gaps={gaps.filter((g) => gapIds.includes(g.id))}
+          allBridges={chatBridgeList}
+          allRoads={chatRoadList}
+          onAddPaper={onAddPaperWithId}
+          onAddPaperToBridge={onAddPaperToBridge}
+          onAddPaperToRoad={onAddPaperToRoad}
+          onUpdatePaper={onUpdatePaper}
+          onShowClaudeSettings={() => setShowClaudeSettings(true)}
+          onExpandChange={setChatExpanded}
+        />
+      )}
+
+      {/* Scrollable content area — papers, gaps, suggestions */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '0 16px 16px',
+        display: chatExpanded ? 'none' : 'flex',
+        flexDirection: 'column',
+        gap: 16,
+      }}>
 
       {/* Gap Memos */}
       <GapMemo gaps={gaps} gapIds={gapIds} onAddGap={onAddGap} onDeleteGap={onDeleteGap} />
@@ -622,6 +723,8 @@ export default function DetailPanel({
           </div>
         )}
       </div>
+
+      </div>{/* end scrollable content area */}
 
       {/* Paper form modal */}
       {(showPaperForm || editingPaper) && (

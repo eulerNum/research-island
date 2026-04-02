@@ -59,8 +59,9 @@ Interactive web app that visualizes food-science research as an island-bridge-ci
 
 **GitHub sync** (`githubService.ts`):
 - SHA-based conflict detection: tracks last-known SHA per file, compares before save
-- Auto-save: 5s debounce after mutations + immediate save on `visibilitychange` (tab hidden)
+- Manual save only: user clicks Save button → GitHub push (no auto-save)
 - Auto-load: on mount + on `visibilitychange` (tab visible) to pick up changes from other devices
+- localStorage: immediate save on every mutation (browser-local data protection)
 - Cache busting: URL `?t=timestamp` on all GitHub API calls (NOT `cache: 'no-store'` or `If-None-Match` — these cause CORS/fetch failures)
 - Large files (>1MB): Git Blob API fallback (NOT `raw.githubusercontent.com` — CORS blocked with auth headers)
 - Base64 encoding: `TextEncoder`/`TextDecoder` based (NOT `btoa`/`atob` with `escape`/`unescape` — breaks on large or Korean-heavy payloads)
@@ -78,7 +79,8 @@ src/
 │   ├── IslandMap.tsx   # D3 island overview + bridge drop targets + island expand
 │   ├── CityMap.tsx     # D3 city detail view + road drop targets
 │   ├── Sidebar.tsx     # Left sidebar (tree nav + paper grouping + draggable + hover tooltip)
-│   ├── DetailPanel.tsx # Right panel (bridge/road papers + gaps + cross-refs)
+│   ├── DetailPanel.tsx # Right panel (bridge/road papers + gaps + AI chat + resizable)
+│   ├── AIChatPanel.tsx # AI 채팅 UI (DetailPanel 상단, Gemini tool use)
 │   ├── PaperStudyPanel.tsx # Wide paper study panel (AI summary, figures, notes)
 │   ├── GapPostitAnimation.tsx # Gap memo postit fly animation
 │   ├── Toolbar.tsx     # Top mode switcher + export
@@ -91,9 +93,10 @@ src/
 │   ├── ContextMenu.tsx
 │   ├── GitHubSettings.tsx
 │   ├── SheetsSettings.tsx
-│   └── ClaudeSettings.tsx
+│   └── ClaudeSettings.tsx  # Claude + Gemini API key 설정
 ├── hooks/
-│   ├── useMapData.ts   # All CRUD + GitHub sync + conflict detection + useMemo
+│   ├── useMapData.ts   # All CRUD + manual Save + auto Load + conflict detection
+│   ├── useAIChat.ts    # AI 채팅 상태 관리 (messages, streaming, tool status)
 │   ├── useToolbar.ts   # Mode state management
 │   └── useTheme.ts     # Dark mode toggle
 ├── contexts/
@@ -104,10 +107,15 @@ src/
 │   ├── mapService.ts   # localStorage CRUD + in-memory cache + Undo/Redo
 │   ├── mapIndexService.ts # GitHub maps-index.json CRUD + PIN hash
 │   ├── githubService.ts   # GitHub Contents API + Blob API + conflict detection
+│   ├── aiService.ts       # Claude API (suggestPapers, summarizePaper — legacy)
+│   ├── aiChatService.ts   # Gemini 기반 AI 채팅 (tool use + 자동분류)
+│   ├── geminiService.ts   # Gemini 2.5 Flash API 연동
+│   ├── deepSearchService.ts # Deep Search v2 (7-phase pipeline)
+│   ├── semanticScholarService.ts # S2 search + refs/cites + recommendations
+│   ├── openAlexService.ts # OpenAlex search + citations + venue search
+│   ├── pubmedService.ts   # PubMed E-utilities search
 │   ├── sheetsService.ts
-│   ├── figureService.ts
-│   ├── aiService.ts
-│   └── semanticScholarService.ts
+│   └── figureService.ts
 └── utils/
     ├── idGenerator.ts
     └── exportMap.ts    # SVG/PNG export
