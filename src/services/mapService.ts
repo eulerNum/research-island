@@ -9,16 +9,156 @@ import type {
 } from './types';
 
 const LEGACY_STORAGE_KEY = 'research-island-map';
-const MAX_UNDO = 50;
+const DB_NAME = 'research-island-map-db';
+const DB_VERSION = 1;
+const STORE_NAME = 'maps';
+const MAX_UNDO = 20;
+const UNDO_BUDGET_BYTES = 50 * 1024 * 1024; // 50 MB total for undo+redo
 
 let activeMapId: string | null = null;
 let cache: ResearchMap | null = null;
 const undoStack: string[] = [];
 const redoStack: string[] = [];
+let undoBytes = 0;
+let redoBytes = 0;
+
+function strBytes(s: string): number {
+  return s.length * 2; // JS strings are UTF-16
+}
 
 function storageKey(): string {
   return activeMapId ? `research-map-${activeMapId}` : LEGACY_STORAGE_KEY;
 }
+
+// ─── IndexedDB helpers ─────────────────────────────────────
+
+let dbPromise: Promise<IDBDatabase> | null = null;
+
+function openDB(): Promise<IDBDatabase> {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+/** Read a map from IndexedDB (async) */
+async function idbGet(key: string): Promise<ResearchMap | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.get(key);
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** Write a map to IndexedDB (async, fire-and-forget safe) */
+async function idbSet(key: string, value: ResearchMap): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** Delete a key from IndexedDB */
+async function idbDelete(key: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** Check if a key exists in IndexedDB */
+async function idbHas(key: string): Promise<boolean> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store = tx.objectStore(STORE_NAME);
+    const req = store.count(key);
+    req.onsuccess = () => resolve(req.result > 0);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ─── Migration: localStorage → IndexedDB ───────────────────
+
+/** Migrate all research-map-* keys from localStorage to IndexedDB, then remove them. */
+async function migrateFromLocalStorage(): Promise<void> {
+  const keysToMigrate: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && (key === LEGACY_STORAGE_KEY || key.startsWith('research-map-'))) {
+      keysToMigrate.push(key);
+    }
+  }
+  for (const key of keysToMigrate) {
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      try {
+        const map = JSON.parse(raw) as ResearchMap;
+        const alreadyInIdb = await idbHas(key);
+        if (!alreadyInIdb) {
+          await idbSet(key, map);
+        }
+        localStorage.removeItem(key);
+      } catch {
+        // corrupted data — just remove it
+        localStorage.removeItem(key);
+      }
+    }
+  }
+}
+
+// ─── Init (async, called once per mapId switch) ────────────
+
+let initPromise: Promise<void> | null = null;
+let initDone = false;
+
+/** Initialize: migrate localStorage → IndexedDB, load into cache.
+ *  Returns a promise that resolves when cache is ready.
+ *  Safe to call multiple times — deduplicates. */
+export async function initStorage(): Promise<void> {
+  if (initDone) return;
+  if (initPromise) return initPromise;
+  initPromise = (async () => {
+    await migrateFromLocalStorage();
+    // Load current map into cache
+    const data = await idbGet(storageKey());
+    if (data) {
+      cache = data;
+    } else {
+      cache = { islands: [], bridges: [], roads: [], papers: [], gaps: [] };
+    }
+    initDone = true;
+  })();
+  return initPromise;
+}
+
+/** Reset init state — called when activeMapId changes */
+function resetInit(): void {
+  initDone = false;
+  initPromise = null;
+}
+
+// ─── Core load/save ────────────────────────────────────────
 
 /** Set the active map ID. Clears cache and undo stacks. */
 export function setActiveMapId(mapId: string | null): void {
@@ -27,6 +167,9 @@ export function setActiveMapId(mapId: string | null): void {
   cache = null;
   undoStack.length = 0;
   redoStack.length = 0;
+  undoBytes = 0;
+  redoBytes = 0;
+  resetInit();
 }
 
 export function getActiveMapId(): string | null {
@@ -41,37 +184,53 @@ export function hasLegacyData(): boolean {
 /** Remove legacy data after migration */
 export function removeLegacyData(): void {
   localStorage.removeItem(LEGACY_STORAGE_KEY);
+  idbDelete(LEGACY_STORAGE_KEY).catch(() => {});
 }
 
 function loadMap(): ResearchMap {
   if (cache) return cache;
-  const raw = localStorage.getItem(storageKey());
-  if (raw) {
-    cache = JSON.parse(raw) as ResearchMap;
-    return cache;
-  }
+  // Fallback: if initStorage hasn't completed, return empty map.
+  // initStorage will overwrite cache when done.
   cache = { islands: [], bridges: [], roads: [], papers: [], gaps: [] };
   return cache;
 }
 
 function saveMap(map: ResearchMap): void {
   cache = map;
-  localStorage.setItem(storageKey(), JSON.stringify(map));
+  // Fire-and-forget write to IndexedDB (async, but we don't block)
+  idbSet(storageKey(), structuredClone(map)).catch((err) => {
+    console.warn('[mapService] IndexedDB write failed:', err);
+  });
 }
 
 /** Push current state to undo stack before a mutation */
 function pushUndo(): void {
   const snapshot = JSON.stringify(loadMap());
+  const size = strBytes(snapshot);
   undoStack.push(snapshot);
-  if (undoStack.length > MAX_UNDO) undoStack.shift();
-  redoStack.length = 0; // clear redo on new action
-}
+  undoBytes += size;
 
+  // Evict oldest until under budget and count cap
+  while (undoStack.length > MAX_UNDO || undoBytes + redoBytes > UNDO_BUDGET_BYTES) {
+    if (undoStack.length <= 1) break;
+    const evicted = undoStack.shift()!;
+    undoBytes -= strBytes(evicted);
+  }
+
+  // Clear redo on new action
+  redoStack.length = 0;
+  redoBytes = 0;
+}
 
 export function undo(): boolean {
   const snapshot = undoStack.pop();
   if (!snapshot) return false;
-  redoStack.push(JSON.stringify(loadMap()));
+  undoBytes -= strBytes(snapshot);
+
+  const currentSnapshot = JSON.stringify(loadMap());
+  redoStack.push(currentSnapshot);
+  redoBytes += strBytes(currentSnapshot);
+
   const restored = JSON.parse(snapshot) as ResearchMap;
   saveMap(restored);
   return true;
@@ -80,7 +239,12 @@ export function undo(): boolean {
 export function redo(): boolean {
   const snapshot = redoStack.pop();
   if (!snapshot) return false;
-  undoStack.push(JSON.stringify(loadMap()));
+  redoBytes -= strBytes(snapshot);
+
+  const currentSnapshot = JSON.stringify(loadMap());
+  undoStack.push(currentSnapshot);
+  undoBytes += strBytes(currentSnapshot);
+
   const restored = JSON.parse(snapshot) as ResearchMap;
   saveMap(restored);
   return true;
@@ -382,9 +546,8 @@ export function getFullMap(): ResearchMap {
     }
   }
   if (cleaned) {
-    // Persist the cleanup to cache + localStorage
     cache = structuredClone(map);
-    localStorage.setItem(storageKey(), JSON.stringify(cache));
+    saveMap(cache);
   }
   return map;
 }

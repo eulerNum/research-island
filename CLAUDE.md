@@ -57,13 +57,21 @@ Interactive web app that visualizes food-science research as an island-bridge-ci
 
 **App state**: `useMapData` hook manages full CRUD + GitHub save/load. Position-only updates bypass React state for D3 drag performance.
 
+**Local persistence** (`mapService.ts`):
+- IndexedDB for map data (NOT localStorage — 5MB limit exceeded with large maps)
+- In-memory cache for sync reads; IndexedDB writes are async fire-and-forget
+- `initStorage()`: migrates legacy localStorage data → IndexedDB on first load
+- Undo/redo: size-budgeted (50MB total, max 20 snapshots) to prevent RAM explosion
+- localStorage is ONLY used for small config values (API keys, theme, GitHub config)
+
 **GitHub sync** (`githubService.ts`):
 - SHA-based conflict detection: tracks last-known SHA per file, compares before save
 - Manual save only: user clicks Save button → GitHub push (no auto-save)
-- Auto-load: on mount + on `visibilitychange` (tab visible) to pick up changes from other devices
-- localStorage: immediate save on every mutation (browser-local data protection)
+- Auto-load: on mount to pick up changes from other devices
+- Small files (<1MB): Contents API PUT (single request)
+- Large files (>1MB) save: Git Data API (blob → tree → commit → update ref)
+- Large files (>1MB) load: Git Blob API fallback (NOT `raw.githubusercontent.com` — CORS blocked with auth headers)
 - Cache busting: URL `?t=timestamp` on all GitHub API calls (NOT `cache: 'no-store'` or `If-None-Match` — these cause CORS/fetch failures)
-- Large files (>1MB): Git Blob API fallback (NOT `raw.githubusercontent.com` — CORS blocked with auth headers)
 - Base64 encoding: `TextEncoder`/`TextDecoder` based (NOT `btoa`/`atob` with `escape`/`unescape` — breaks on large or Korean-heavy payloads)
 
 ## File Structure

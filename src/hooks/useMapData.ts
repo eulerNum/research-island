@@ -25,22 +25,23 @@ export function useMapData(mapId?: string) {
     setMapData(mapService.getFullMap());
   }, []);
 
-  // Auto-load from GitHub on mount (Google Drive model: open → latest data)
+  // Init IndexedDB storage, then auto-load from GitHub
   useEffect(() => {
     mapService.setActiveMapId(effectiveMapId);
-    const config = githubService.getGitHubConfig();
-    if (config && effectiveMapId) {
-      githubService.loadFromGitHub(config, effectiveMapId)
-        .then((map) => {
-          mapService.importMap(map);
-          refresh();
-        })
-        .catch(() => {
-          refresh(); // fall back to localStorage
-        });
-    } else {
-      refresh();
-    }
+    mapService.initStorage().then(() => {
+      refresh(); // apply IndexedDB data to cache
+      const config = githubService.getGitHubConfig();
+      if (config && effectiveMapId) {
+        githubService.loadFromGitHub(config, effectiveMapId)
+          .then((map) => {
+            mapService.importMap(map);
+            refresh();
+          })
+          .catch(() => {
+            refresh(); // fall back to IndexedDB data
+          });
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveMapId]);
 

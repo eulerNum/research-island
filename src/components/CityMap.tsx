@@ -203,7 +203,7 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       .data(roads)
       .enter()
       .append('g')
-      .attr('class', 'road-group')
+      .attr('class', (d) => `road-group road-group-${d.id}`)
       .attr('cursor', 'pointer')
       .on('click', (_event, d) => {
         _event.stopPropagation();
@@ -450,6 +450,78 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
       });
 
     cityGroups.call(drag);
+
+    // SVG-level drag-over/drop for paper drag from sidebar
+    const svgEl = svgRef.current!;
+    let hoveredRoadId: string | null = null;
+
+    const findNearestRoad = (clientX: number, clientY: number): string | null => {
+      const ctm = g.node()!.getScreenCTM();
+      if (!ctm) return null;
+      const pt = svgEl.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const svgPt = pt.matrixTransform(ctm.inverse());
+
+      let bestId: string | null = null;
+      let bestDist = 40;
+      for (const r of roads) {
+        const mid = roadMidpoint(r);
+        const dist = Math.hypot(svgPt.x - mid.x, svgPt.y - mid.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = r.id;
+        }
+      }
+      return bestId;
+    };
+
+    const handleSvgDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes('application/paper-id')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      const nearId = findNearestRoad(e.clientX, e.clientY);
+      if (nearId !== hoveredRoadId) {
+        if (hoveredRoadId) {
+          g.select(`.road-group-${hoveredRoadId} .road`).attr('stroke-width', 2.5).attr('filter', null);
+        }
+        if (nearId) {
+          g.select(`.road-group-${nearId} .road`).attr('stroke-width', 5).attr('filter', 'url(#road-glow)');
+        }
+        hoveredRoadId = nearId;
+      }
+    };
+
+    const handleSvgDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const paperId = e.dataTransfer?.getData('application/paper-id');
+      if (paperId && hoveredRoadId) {
+        onPaperDropOnRoadRef.current?.(paperId, hoveredRoadId);
+      }
+      if (hoveredRoadId) {
+        g.select(`.road-group-${hoveredRoadId} .road`).attr('stroke-width', 2.5).attr('filter', null);
+        hoveredRoadId = null;
+      }
+    };
+
+    const handleSvgDragLeave = (e: DragEvent) => {
+      if (!svgEl.contains(e.relatedTarget as Node)) {
+        if (hoveredRoadId) {
+          g.select(`.road-group-${hoveredRoadId} .road`).attr('stroke-width', 2.5).attr('filter', null);
+          hoveredRoadId = null;
+        }
+      }
+    };
+
+    svgEl.addEventListener('dragover', handleSvgDragOver);
+    svgEl.addEventListener('drop', handleSvgDrop);
+    svgEl.addEventListener('dragleave', handleSvgDragLeave);
+
+    return () => {
+      svgEl.removeEventListener('dragover', handleSvgDragOver);
+      svgEl.removeEventListener('drop', handleSvgDrop);
+      svgEl.removeEventListener('dragleave', handleSvgDragLeave);
+    };
   }, [island, roads, connectionStart]);
 
   useEffect(() => {

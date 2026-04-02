@@ -63,6 +63,8 @@ export function base64ToUtf8(b64: string): string {
   return new TextDecoder().decode(bytes);
 }
 
+const BLOB_SAVE_THRESHOLD = 1 * 1024 * 1024; // 1 MB — switch to Git Data API above this
+
 export async function saveToGitHub(
   config: GitHubConfig,
   map: ResearchMap,
@@ -70,6 +72,21 @@ export async function saveToGitHub(
 ): Promise<void> {
   const filePath = mapId ? mapFilePath(mapId) : LEGACY_FILE_PATH;
   const jsonStr = JSON.stringify(map, null, 2);
+
+  if (jsonStr.length > BLOB_SAVE_THRESHOLD) {
+    await saveViaGitDataApi(config, filePath, jsonStr, mapId);
+  } else {
+    await saveViaContentsApi(config, filePath, jsonStr, mapId);
+  }
+}
+
+/** Small files: use Contents API PUT (simple, single request) */
+async function saveViaContentsApi(
+  config: GitHubConfig,
+  filePath: string,
+  jsonStr: string,
+  mapId?: string,
+): Promise<void> {
   const content = utf8ToBase64(jsonStr);
 
   const doPut = async (sha: string | null): Promise<{ res: Response; result: Record<string, unknown> | null }> => {
@@ -118,6 +135,69 @@ export async function saveToGitHub(
   if (!res.ok) {
     throw new Error((result?.message as string) || `GitHub save failed: ${res.status}`);
   }
+}
+
+/** Large files: use Git Data API (blob → tree → commit → update ref) */
+async function saveViaGitDataApi(
+  config: GitHubConfig,
+  filePath: string,
+  jsonStr: string,
+  mapId?: string,
+): Promise<void> {
+  const apiBase = `https://api.github.com/repos/${config.owner}/${config.repo}`;
+  const headers = {
+    Authorization: `Bearer ${config.token}`,
+    'Content-Type': 'application/json',
+  };
+  const branch = 'main';
+
+  // 1. Create blob
+  const blobRes = await fetch(`${apiBase}/git/blobs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ content: utf8ToBase64(jsonStr), encoding: 'base64' }),
+  });
+  if (!blobRes.ok) throw new Error(`GitHub 저장 실패 — Blob 생성 오류: ${blobRes.status}`);
+  const { sha: blobSha } = await blobRes.json();
+
+  // 2. Get current branch ref
+  const refRes = await fetch(`${apiBase}/git/refs/heads/${branch}?t=${Date.now()}`, { headers });
+  if (!refRes.ok) throw new Error(`GitHub 저장 실패 — 브랜치 조회 오류: ${refRes.status}`);
+  const refData = await refRes.json();
+  const latestCommitSha = refData.object.sha;
+
+  // 3. Create tree with new blob
+  const treeRes = await fetch(`${apiBase}/git/trees`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      base_tree: latestCommitSha,
+      tree: [{ path: filePath, mode: '100644', type: 'blob', sha: blobSha }],
+    }),
+  });
+  if (!treeRes.ok) throw new Error(`GitHub 저장 실패 — Tree 생성 오류: ${treeRes.status}`);
+  const { sha: treeSha } = await treeRes.json();
+
+  // 4. Create commit
+  const commitRes = await fetch(`${apiBase}/git/commits`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      message: `Update map ${mapId ?? 'legacy'}`,
+      tree: treeSha,
+      parents: [latestCommitSha],
+    }),
+  });
+  if (!commitRes.ok) throw new Error(`GitHub 저장 실패 — Commit 생성 오류: ${commitRes.status}`);
+  const { sha: commitSha } = await commitRes.json();
+
+  // 5. Update branch ref
+  const updateRefRes = await fetch(`${apiBase}/git/refs/heads/${branch}`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ sha: commitSha }),
+  });
+  if (!updateRefRes.ok) throw new Error(`GitHub 저장 실패 — Ref 업데이트 오류: ${updateRefRes.status}`);
 }
 
 export async function loadFromGitHub(

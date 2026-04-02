@@ -188,7 +188,7 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       .data(data.bridges)
       .enter()
       .append('g')
-      .attr('class', 'bridge-group')
+      .attr('class', (d) => `bridge-group bridge-group-${d.id}`)
       .attr('cursor', 'pointer')
       .on('click', (_event, d) => {
         _event.stopPropagation();
@@ -561,31 +561,82 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
       simulationRef.current = null;
     }
 
-    // Show all bridges as drop targets during paper drag
+    // SVG-level drag-over/drop for paper drag from sidebar
+    // (SVG child elements don't reliably fire HTML5 drag events in all browsers)
     const svgEl = svgRef.current!;
-    const handleDragEnter = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes('application/paper-id')) {
-        svgEl.classList.add('dragging-paper');
+    let hoveredBridgeId: string | null = null;
+
+    const findNearestBridge = (clientX: number, clientY: number): string | null => {
+      const ctm = g.node()!.getScreenCTM();
+      if (!ctm) return null;
+      const pt = svgEl.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const svgPt = pt.matrixTransform(ctm.inverse());
+
+      let bestId: string | null = null;
+      let bestDist = 60; // max distance threshold in SVG units
+      for (const b of data.bridges) {
+        const mid = bridgeMidpoint(b);
+        const dist = Math.hypot(svgPt.x - mid.x, svgPt.y - mid.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestId = b.id;
+        }
+      }
+      return bestId;
+    };
+
+    const handleSvgDragOver = (e: DragEvent) => {
+      if (!e.dataTransfer?.types.includes('application/paper-id')) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+
+      const nearId = findNearestBridge(e.clientX, e.clientY);
+      if (nearId !== hoveredBridgeId) {
+        // Unhighlight old
+        if (hoveredBridgeId) {
+          g.select(`.bridge-group-${hoveredBridgeId} .bridge`).attr('stroke-width', 3).attr('filter', null);
+        }
+        // Highlight new
+        if (nearId) {
+          g.select(`.bridge-group-${nearId} .bridge`).attr('stroke-width', 6).attr('filter', 'url(#glow)');
+        }
+        hoveredBridgeId = nearId;
       }
     };
-    const handleDragLeaveDoc = (e: DragEvent) => {
-      if (e.dataTransfer?.types.includes('application/paper-id') && !svgEl.contains(e.relatedTarget as Node)) {
-        svgEl.classList.remove('dragging-paper');
+
+    const handleSvgDrop = (e: DragEvent) => {
+      e.preventDefault();
+      const paperId = e.dataTransfer?.getData('application/paper-id');
+      if (paperId && hoveredBridgeId) {
+        onPaperDropOnBridgeRef.current?.(paperId, hoveredBridgeId);
+      }
+      if (hoveredBridgeId) {
+        g.select(`.bridge-group-${hoveredBridgeId} .bridge`).attr('stroke-width', 3).attr('filter', null);
+        hoveredBridgeId = null;
       }
     };
-    const handleDragEndDoc = () => {
-      svgEl.classList.remove('dragging-paper');
+
+    const handleSvgDragLeave = (e: DragEvent) => {
+      if (!svgEl.contains(e.relatedTarget as Node)) {
+        if (hoveredBridgeId) {
+          g.select(`.bridge-group-${hoveredBridgeId} .bridge`).attr('stroke-width', 3).attr('filter', null);
+          hoveredBridgeId = null;
+        }
+      }
     };
-    svgEl.addEventListener('dragenter', handleDragEnter);
-    svgEl.addEventListener('dragleave', handleDragLeaveDoc);
-    document.addEventListener('dragend', handleDragEndDoc);
+
+    svgEl.addEventListener('dragover', handleSvgDragOver);
+    svgEl.addEventListener('drop', handleSvgDrop);
+    svgEl.addEventListener('dragleave', handleSvgDragLeave);
 
     return () => {
       simulationRef.current?.stop();
       simulationRef.current = null;
-      svgEl.removeEventListener('dragenter', handleDragEnter);
-      svgEl.removeEventListener('dragleave', handleDragLeaveDoc);
-      document.removeEventListener('dragend', handleDragEndDoc);
+      svgEl.removeEventListener('dragover', handleSvgDragOver);
+      svgEl.removeEventListener('drop', handleSvgDrop);
+      svgEl.removeEventListener('dragleave', handleSvgDragLeave);
     };
   }, [data, connectionStart]);
 
