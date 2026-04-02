@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { ResearchMap } from '../services/types';
 import { useMapDataContext } from '../contexts/MapDataContext';
 import GitHubSettings from './GitHubSettings';
+import ClaudeSettings from './ClaudeSettings';
 import { getGitHubConfig } from '../services/githubService';
 
 interface SidebarProps {
@@ -19,6 +20,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
   const basePath = mapId ? `/map/${mapId}` : '';
   const ctx = useMapDataContext();
   const [showGitHubSettings, setShowGitHubSettings] = useState(false);
+  const [showClaudeSettings, setShowClaudeSettings] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedIslands, setExpandedIslands] = useState<Set<string>>(new Set());
@@ -227,6 +229,13 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
         <div style={{ display: 'flex', flexDirection: isExpanded ? 'row' : 'column', gap: 6 }}>
           <button onClick={handleSave} disabled={loading} style={isExpanded ? syncBtn : iconBtn} title="Save">
             {isExpanded ? (loading ? '...' : 'Save') : '\u{1F4BE}'}
+          </button>
+          <button
+            onClick={() => setShowClaudeSettings(true)}
+            style={isExpanded ? syncBtn : iconBtn}
+            title="AI Settings"
+          >
+            {isExpanded ? 'Settings' : '\u2699'}
           </button>
         </div>
       </div>
@@ -546,6 +555,9 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
 
       {showGitHubSettings && (
         <GitHubSettings onClose={() => setShowGitHubSettings(false)} />
+      )}
+      {showClaudeSettings && (
+        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
       )}
     </aside>
   );

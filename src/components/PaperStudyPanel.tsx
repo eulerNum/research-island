@@ -51,8 +51,33 @@ export default function PaperStudyPanel({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [showClaudeSettings, setShowClaudeSettings] = useState(false);
+  const [panelWidth, setPanelWidth] = useState(420);
+  const resizingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const saveTimerRef = useRef<number | null>(null);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = startX - ev.clientX;
+      setPanelWidth(Math.max(320, Math.min(600, startWidth + delta)));
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
 
   // Cross-references: which bridges/roads contain this paper
   const crossRefs = useMemo(() => {
@@ -128,18 +153,35 @@ export default function PaperStudyPanel({
   return (
     <aside
       style={{
-        flex: 1,
-        minWidth: 400,
+        width: panelWidth,
         borderLeft: '1px solid var(--border-secondary)',
         background: 'var(--bg-primary)',
         overflowY: 'auto',
-        padding: '24px 32px',
+        padding: '16px 20px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 20,
+        gap: 16,
+        position: 'relative',
         flexShrink: 0,
       }}
     >
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          cursor: 'col-resize',
+          zIndex: 10,
+          background: 'transparent',
+        }}
+        onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--accent-forward)'; }}
+        onMouseLeave={(e) => { if (!resizingRef.current) (e.target as HTMLElement).style.background = 'transparent'; }}
+      />
+
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
         <h2 style={{ fontSize: '1.3rem', margin: 0, color: 'var(--text-heading)', lineHeight: 1.3 }}>

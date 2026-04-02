@@ -200,18 +200,27 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
         onContextMenuRef.current?.({ type: 'bridge', id: d.id, screenX: _event.clientX, screenY: _event.clientY });
       });
 
-    // Native DOM drag-over/drop for paper drag from sidebar
-    bridgeGroups.each(function (d) {
-      const el = this as SVGGElement;
+    // Invisible wide hit area for easy clicking and drag-drop
+    const bridgeHitAreas = bridgeGroups
+      .append('path')
+      .attr('class', 'bridge-hit')
+      .attr('fill', 'none')
+      .attr('stroke', 'transparent')
+      .attr('stroke-width', 32)
+      .attr('pointer-events', 'stroke');
+
+    // Native DOM drag-over/drop on hit areas (must be after hit area creation)
+    bridgeHitAreas.each(function (d) {
+      const el = this as SVGPathElement;
       el.addEventListener('dragover', (e) => {
         if (e.dataTransfer?.types.includes('application/paper-id')) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
-          d3.select(el).select('.bridge').attr('stroke-width', 6).attr('filter', 'url(#glow)');
+          d3.select(el.parentNode as Element).select('.bridge').attr('stroke-width', 6).attr('filter', 'url(#glow)');
         }
       });
       el.addEventListener('dragleave', () => {
-        d3.select(el).select('.bridge').attr('stroke-width', 3).attr('filter', null);
+        d3.select(el.parentNode as Element).select('.bridge').attr('stroke-width', 3).attr('filter', null);
       });
       el.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -219,17 +228,9 @@ const IslandMap = forwardRef<SVGSVGElement, IslandMapProps>(function IslandMap({
         if (paperId) {
           onPaperDropOnBridgeRef.current?.(paperId, d.id);
         }
-        d3.select(el).select('.bridge').attr('stroke-width', 3).attr('filter', null);
+        d3.select(el.parentNode as Element).select('.bridge').attr('stroke-width', 3).attr('filter', null);
       });
     });
-
-    // Invisible wide hit area for easy clicking and drag-drop
-    const bridgeHitAreas = bridgeGroups
-      .append('path')
-      .attr('class', 'bridge-hit')
-      .attr('fill', 'none')
-      .attr('stroke', 'transparent')
-      .attr('stroke-width', 32);
 
     // Visible bridge path with flowing dash animation
     const bridgeLines = bridgeGroups

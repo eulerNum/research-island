@@ -6,6 +6,7 @@ import Toolbar from '../components/Toolbar';
 import Sidebar from '../components/Sidebar';
 import IslandMap from '../components/IslandMap';
 import DetailPanel from '../components/DetailPanel';
+import AIChatPanel from '../components/AIChatPanel';
 import PromptDialog from '../components/PromptDialog';
 import ContextMenu from '../components/ContextMenu';
 import type { ContextMenuItem, ContextMenuPaletteItem } from '../components/ContextMenu';
@@ -41,6 +42,7 @@ export default function OverviewPage() {
   const [highlightedPaperId, setHighlightedPaperId] = useState<string | null>(null);
   const [studyPaperId, setStudyPaperId] = useState<string | null>(null);
   const [expandedIslandId, setExpandedIslandId] = useState<string | null>(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [gapPostit, setGapPostit] = useState<{
     gapId: string;
     description: string;
@@ -142,8 +144,7 @@ export default function OverviewPage() {
   }, [ctx.mapData.islands]);
 
   const handleSelectPaper = useCallback((paperId: string) => {
-    // Open Paper Study Panel (closes bridge DetailPanel)
-    setSelectedBridgeId(null);
+    // Open Paper Study Panel (keeps DetailPanel open for 3-panel view)
     setStudyPaperId(paperId);
     setHighlightedPaperId(paperId);
   }, []);
@@ -288,6 +289,40 @@ export default function OverviewPage() {
     ? ctx.mapData.bridges.find((b) => b.id === selectedBridgeId)
     : undefined;
 
+  // AI Chat helper data
+  const selectedBridgeDisplayName = useMemo(() => {
+    if (!selectedBridge) return '';
+    const src = islandNameMap.get(selectedBridge.sourceIslandId) ?? '?';
+    const tgt = islandNameMap.get(selectedBridge.targetIslandId) ?? '?';
+    return selectedBridge.label ? `${src}\u2192${tgt}: ${selectedBridge.label}` : `${src}\u2192${tgt}`;
+  }, [selectedBridge, islandNameMap]);
+
+  const chatBridgeList = useMemo(() =>
+    ctx.mapData.bridges.map((b) => ({
+      id: b.id,
+      sourceLabel: islandNameMap.get(b.sourceIslandId) ?? '?',
+      targetLabel: islandNameMap.get(b.targetIslandId) ?? '?',
+      label: b.label ?? '',
+    })),
+  [ctx.mapData.bridges, islandNameMap]);
+
+  const chatRoadList = useMemo(() =>
+    ctx.mapData.roads.map((r) => ({
+      id: r.id,
+      sourceLabel: cityNameMap.get(r.sourceCityId) ?? '?',
+      targetLabel: cityNameMap.get(r.targetCityId) ?? '?',
+      label: r.label ?? '',
+    })),
+  [ctx.mapData.roads, cityNameMap]);
+
+  const selectedBridgePapers = useMemo(() =>
+    selectedBridge ? ctx.mapData.papers.filter((p) => selectedBridge.paperIds.includes(p.id)) : [],
+  [selectedBridge, ctx.mapData.papers]);
+
+  const selectedBridgeGaps = useMemo(() =>
+    selectedBridge ? ctx.mapData.gaps.filter((g) => selectedBridge.gapIds.includes(g.id)) : [],
+  [selectedBridge, ctx.mapData.gaps]);
+
   const studyPaper = studyPaperId
     ? ctx.mapData.papers.find((p) => p.id === studyPaperId)
     : undefined;
@@ -303,7 +338,7 @@ export default function OverviewPage() {
       />
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         <Sidebar data={ctx.mapData} highlightedPaperId={highlightedPaperId} onHighlightPaper={setHighlightedPaperId} onSelectPaper={handleSelectPaper} onGapAnimate={handleGapAnimate} />
-        <main style={{ flex: studyPaper ? 0.4 : 1, minWidth: 300, position: 'relative', transition: 'flex 0.3s ease' }}>
+        <main style={{ flex: 1, minWidth: 300, position: 'relative' }}>
           <IslandMap
             ref={mapSvgRef}
             data={ctx.mapData}
@@ -320,6 +355,25 @@ export default function OverviewPage() {
             onPaperDropOnBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
           />
         </main>
+        {selectedBridge && aiChatOpen && (
+          <AIChatPanel
+            entity={selectedBridge}
+            entityType="bridge"
+            entityDisplayName={selectedBridgeDisplayName}
+            sourceLabel={islandNameMap.get(selectedBridge.sourceIslandId) ?? 'Source'}
+            targetLabel={islandNameMap.get(selectedBridge.targetIslandId) ?? 'Target'}
+            existingPapers={selectedBridgePapers}
+            gaps={selectedBridgeGaps}
+            allBridges={chatBridgeList}
+            allRoads={chatRoadList}
+            onAddPaper={(paper) => ctx.addPaper(paper)}
+            onAddPaperToBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
+            onAddPaperToRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
+            onUpdatePaper={ctx.updatePaper}
+            onShowClaudeSettings={() => {}}
+            onClose={() => setAiChatOpen(false)}
+          />
+        )}
         {selectedBridge && (
           <DetailPanel
             bridge={selectedBridge}
@@ -351,7 +405,10 @@ export default function OverviewPage() {
             onNavigateToRoad={handleNavigateToRoad}
             onAddPaperToBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
             onAddPaperToRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
-            onClose={() => { setSelectedBridgeId(null); setHighlightedPaperId(null); }}
+            onClose={() => { setSelectedBridgeId(null); setHighlightedPaperId(null); setAiChatOpen(false); }}
+            aiChatOpen={aiChatOpen}
+            onToggleAIChat={() => setAiChatOpen((v) => !v)}
+            onStudyPaper={(paperId) => { setStudyPaperId(paperId); setHighlightedPaperId(paperId); }}
           />
         )}
         {studyPaper && (

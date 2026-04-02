@@ -7,6 +7,7 @@ import { generateId } from '../utils/idGenerator';
 interface AIChatPanelProps {
   entity: Bridge | Road | undefined;
   entityType: 'bridge' | 'road';
+  entityDisplayName: string;
   sourceLabel: string;
   targetLabel: string;
   existingPapers: Paper[];
@@ -18,12 +19,13 @@ interface AIChatPanelProps {
   onAddPaperToRoad: (paperId: string, roadId: string) => void;
   onUpdatePaper: (paper: Paper) => void;
   onShowClaudeSettings: () => void;
-  onExpandChange?: (expanded: boolean) => void;
+  onClose: () => void;
 }
 
 export default function AIChatPanel({
   entity,
   entityType,
+  entityDisplayName,
   sourceLabel,
   targetLabel,
   existingPapers,
@@ -35,15 +37,10 @@ export default function AIChatPanel({
   onAddPaperToRoad,
   onUpdatePaper,
   onShowClaudeSettings,
-  onExpandChange,
+  onClose,
 }: AIChatPanelProps) {
-  const [expanded, setExpanded] = useState(false);
-
-  const toggleExpanded = useCallback(() => {
-    const next = !expanded;
-    setExpanded(next);
-    onExpandChange?.(next);
-  }, [expanded, onExpandChange]);
+  const [panelWidth, setPanelWidth] = useState(380);
+  const resizingRef = useRef(false);
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -67,6 +64,30 @@ export default function AIChatPanel({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chat.messages, chat.streamingText, chat.toolStatus]);
+
+  const handleResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startX = e.clientX;
+    const startWidth = panelWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const delta = startX - ev.clientX;
+      setPanelWidth(Math.max(300, Math.min(500, startWidth + delta)));
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, [panelWidth]);
 
   const handleSend = useCallback(() => {
     if (!input.trim() || chat.isStreaming) return;
@@ -102,216 +123,263 @@ export default function AIChatPanel({
   if (!entity) return null;
 
   return (
-    <div style={{
-      borderBottom: expanded ? 'none' : '1px solid var(--border-primary)',
-      display: 'flex',
-      flexDirection: 'column',
-      flex: expanded ? 1 : 'none',
-      minHeight: expanded ? 0 : 'auto',
-      overflow: 'hidden',
-    }}>
-      {/* Header toggle */}
-      <button
-        onClick={toggleExpanded}
+    <aside
+      style={{
+        width: panelWidth,
+        borderLeft: '1px solid var(--border-secondary)',
+        borderRight: '1px solid var(--border-secondary)',
+        background: 'var(--bg-primary)',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+        position: 'relative',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Resize handle (left edge) */}
+      <div
+        onMouseDown={handleResizeStart}
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          padding: '8px 12px',
-          background: 'var(--bg-ai)',
-          border: 'none',
-          borderBottom: expanded ? '1px solid var(--border-ai)' : 'none',
-          cursor: 'pointer',
-          fontSize: '0.8rem',
-          fontWeight: 600,
-          color: 'var(--text-ai)',
-          width: '100%',
-          textAlign: 'left',
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 4,
+          cursor: 'col-resize',
+          zIndex: 10,
+          background: 'transparent',
         }}
-      >
-        <span style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>
-          ▶
-        </span>
-        AI Chat
-        {chat.messages.length > 0 && (
-          <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 400 }}>
-            ({chat.messages.length})
+        onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--accent-forward)'; }}
+        onMouseLeave={(e) => { if (!resizingRef.current) (e.target as HTMLElement).style.background = 'transparent'; }}
+      />
+
+      {/* Header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '8px 12px',
+        background: 'var(--bg-ai)',
+        borderBottom: '1px solid var(--border-ai)',
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-ai)', flexShrink: 0 }}>
+            AI Chat
           </span>
-        )}
-      </button>
-
-      {expanded && (
-        <>
-          {/* Messages area */}
-          <div style={{
-            flex: 1,
-            overflowY: 'auto',
-            padding: '8px 10px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-            minHeight: 0,
+          <span style={{
+            fontSize: '0.7rem',
+            color: 'var(--text-tertiary)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
           }}>
-            {chat.messages.length === 0 && !chat.isStreaming && (
-              <div style={{
-                color: 'var(--text-tertiary)',
-                fontSize: '0.75rem',
-                textAlign: 'center',
-                padding: '20px 10px',
-                lineHeight: 1.6,
-              }}>
-                이 {entityType === 'bridge' ? '다리' : '도로'}에 대해 질문하세요.<br />
-                예: "관련 논문 찾아줘", "최근 연구 트렌드는?"
-              </div>
-            )}
-
-            {chat.messages.map((msg) => (
-              <MessageBubble
-                key={msg.id}
-                message={msg}
-                onAddPaper={(idx, card) => handleAddPaper(msg.id, idx, card)}
-              />
-            ))}
-
-            {/* Streaming indicator */}
-            {chat.isStreaming && (
-              <div style={{
-                alignSelf: 'flex-start',
-                maxWidth: '90%',
-              }}>
-                {chat.toolStatus && (
-                  <div style={{
-                    fontSize: '0.7rem',
-                    color: 'var(--text-ai)',
-                    padding: '4px 8px',
-                    background: 'var(--bg-ai)',
-                    borderRadius: 8,
-                    marginBottom: 4,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                  }}>
-                    <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span>
-                    {chat.toolStatus}
-                  </div>
-                )}
-                {chat.streamingText && (
-                  <div style={{
-                    background: 'var(--bg-secondary)',
-                    padding: '8px 12px',
-                    borderRadius: '12px 12px 12px 4px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-primary)',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}>
-                    {chat.streamingText}
-                    <span style={{ animation: 'blink 1s step-end infinite', opacity: 0.6 }}>▌</span>
-                  </div>
-                )}
-                {!chat.streamingText && !chat.toolStatus && (
-                  <div style={{
-                    background: 'var(--bg-secondary)',
-                    padding: '8px 12px',
-                    borderRadius: '12px 12px 12px 4px',
-                    fontSize: '0.8rem',
-                    color: 'var(--text-tertiary)',
-                  }}>
-                    <span style={{ animation: 'blink 1s step-end infinite' }}>...</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Error */}
-            {chat.error && (
-              <div style={{
-                padding: '8px 10px',
-                background: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: 8,
-                fontSize: '0.75rem',
-                color: '#dc2626',
-              }}>
-                {chat.error}
-                <button
-                  onClick={onShowClaudeSettings}
-                  style={{
-                    marginLeft: 8,
-                    fontSize: '0.7rem',
-                    color: 'var(--text-ai)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    textDecoration: 'underline',
-                  }}
-                >
-                  API 설정
-                </button>
-              </div>
-            )}
-
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Input area */}
-          <div style={{
-            display: 'flex',
-            gap: 6,
-            padding: '8px 10px',
-            borderTop: '1px solid var(--border-primary)',
-            background: 'var(--bg-primary)',
-          }}>
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="메시지를 입력하세요..."
-              disabled={chat.isStreaming}
-              rows={1}
-              style={{
-                flex: 1,
-                padding: '6px 10px',
-                border: '1px solid var(--border-input)',
-                borderRadius: 8,
-                fontSize: '0.8rem',
-                background: 'var(--bg-input)',
-                color: 'var(--text-primary)',
-                resize: 'none',
-                fontFamily: 'inherit',
-                lineHeight: 1.4,
-                maxHeight: 80,
-                overflowY: 'auto',
-              }}
-            />
+            {entityDisplayName}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+          {chat.messages.length > 0 && (
             <button
-              onClick={handleSend}
-              disabled={!input.trim() || chat.isStreaming}
+              onClick={chat.reset}
+              title="New Chat"
               style={{
-                padding: '6px 12px',
-                background: input.trim() && !chat.isStreaming ? 'var(--text-heading)' : 'var(--btn-secondary-bg)',
-                color: input.trim() && !chat.isStreaming ? '#fff' : 'var(--text-tertiary)',
-                border: 'none',
-                borderRadius: 8,
-                cursor: input.trim() && !chat.isStreaming ? 'pointer' : 'default',
-                fontSize: '0.8rem',
-                fontWeight: 600,
-                alignSelf: 'flex-end',
+                padding: '2px 6px',
+                background: 'var(--btn-secondary-bg)',
+                border: '1px solid var(--border-primary)',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: '0.65rem',
+                color: 'var(--text-secondary)',
               }}
             >
-              전송
+              New
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '1.1rem',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+              padding: '0 2px',
+            }}
+          >
+            &times;
+          </button>
+        </div>
+      </div>
+
+      {/* Messages area */}
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '8px 10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 8,
+        minHeight: 0,
+      }}>
+        {chat.messages.length === 0 && !chat.isStreaming && (
+          <div style={{
+            color: 'var(--text-tertiary)',
+            fontSize: '0.75rem',
+            textAlign: 'center',
+            padding: '20px 10px',
+            lineHeight: 1.6,
+          }}>
+            Ask about this {entityType}.<br />
+            e.g. "Find related papers", "Deep search"
+          </div>
+        )}
+
+        {chat.messages.map((msg) => (
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            onAddPaper={(idx, card) => handleAddPaper(msg.id, idx, card)}
+          />
+        ))}
+
+        {/* Streaming indicator */}
+        {chat.isStreaming && (
+          <div style={{
+            alignSelf: 'flex-start',
+            maxWidth: '90%',
+          }}>
+            {chat.toolStatus && (
+              <div style={{
+                fontSize: '0.7rem',
+                color: 'var(--text-ai)',
+                padding: '4px 8px',
+                background: 'var(--bg-ai)',
+                borderRadius: 8,
+                marginBottom: 4,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}>
+                <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⟳</span>
+                {chat.toolStatus}
+              </div>
+            )}
+            {chat.streamingText && (
+              <div style={{
+                background: 'var(--bg-secondary)',
+                padding: '8px 12px',
+                borderRadius: '12px 12px 12px 4px',
+                fontSize: '0.8rem',
+                color: 'var(--text-primary)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+              }}>
+                {chat.streamingText}
+                <span style={{ animation: 'blink 1s step-end infinite', opacity: 0.6 }}>▌</span>
+              </div>
+            )}
+            {!chat.streamingText && !chat.toolStatus && (
+              <div style={{
+                background: 'var(--bg-secondary)',
+                padding: '8px 12px',
+                borderRadius: '12px 12px 12px 4px',
+                fontSize: '0.8rem',
+                color: 'var(--text-tertiary)',
+              }}>
+                <span style={{ animation: 'blink 1s step-end infinite' }}>...</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Error */}
+        {chat.error && (
+          <div style={{
+            padding: '8px 10px',
+            background: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: 8,
+            fontSize: '0.75rem',
+            color: '#dc2626',
+          }}>
+            {chat.error}
+            <button
+              onClick={onShowClaudeSettings}
+              style={{
+                marginLeft: 8,
+                fontSize: '0.7rem',
+                color: 'var(--text-ai)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                textDecoration: 'underline',
+              }}
+            >
+              API 설정
             </button>
           </div>
+        )}
 
-          {/* CSS animations */}
-          <style>{`
-            @keyframes blink { 50% { opacity: 0; } }
-            @keyframes spin { to { transform: rotate(360deg); } }
-          `}</style>
-        </>
-      )}
-    </div>
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input area */}
+      <div style={{
+        display: 'flex',
+        gap: 6,
+        padding: '8px 10px',
+        borderTop: '1px solid var(--border-primary)',
+        background: 'var(--bg-primary)',
+        flexShrink: 0,
+      }}>
+        <textarea
+          ref={inputRef}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Type a message..."
+          disabled={chat.isStreaming}
+          rows={1}
+          style={{
+            flex: 1,
+            padding: '6px 10px',
+            border: '1px solid var(--border-input)',
+            borderRadius: 8,
+            fontSize: '0.8rem',
+            background: 'var(--bg-input)',
+            color: 'var(--text-primary)',
+            resize: 'none',
+            fontFamily: 'inherit',
+            lineHeight: 1.4,
+            maxHeight: 80,
+            overflowY: 'auto',
+          }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || chat.isStreaming}
+          style={{
+            padding: '6px 12px',
+            background: input.trim() && !chat.isStreaming ? 'var(--text-heading)' : 'var(--btn-secondary-bg)',
+            color: input.trim() && !chat.isStreaming ? '#fff' : 'var(--text-tertiary)',
+            border: 'none',
+            borderRadius: 8,
+            cursor: input.trim() && !chat.isStreaming ? 'pointer' : 'default',
+            fontSize: '0.8rem',
+            fontWeight: 600,
+            alignSelf: 'flex-end',
+          }}
+        >
+          Send
+        </button>
+      </div>
+
+      {/* CSS animations */}
+      <style>{`
+        @keyframes blink { 50% { opacity: 0; } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+      `}</style>
+    </aside>
   );
 }
 
@@ -367,7 +435,7 @@ function MessageBubble({
           background: 'var(--bg-ai)',
           borderRadius: 6,
         }}>
-          자동 분류됨: {message.classifiedBridges.map((b) => b.label).join(', ')}
+          Auto-classified: {message.classifiedBridges.map((b) => b.label).join(', ')}
         </div>
       )}
     </div>
@@ -423,7 +491,7 @@ function PaperCardView({
             color: 'var(--accent-forward)',
             fontWeight: 600,
           }}>
-            추가됨 ✓
+            Added ✓
           </span>
         ) : (
           <button
@@ -438,7 +506,7 @@ function PaperCardView({
               fontSize: '0.7rem',
             }}
           >
-            추가
+            Add
           </button>
         )}
         {paper.url && (
@@ -453,7 +521,7 @@ function PaperCardView({
         )}
         {paper.citationCount != null && (
           <span style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>
-            인용 {paper.citationCount}
+            Cited {paper.citationCount}
           </span>
         )}
       </div>

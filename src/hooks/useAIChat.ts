@@ -41,6 +41,14 @@ interface UseAIChatReturn {
   markPaperAdded: (messageId: string, paperIndex: number) => void;
 }
 
+// Per-entity chat history store (in-memory, not persisted)
+interface ChatStore {
+  messages: ChatMessage[];
+  apiMessages: ApiMessage[];
+}
+
+const chatStoreMap = new Map<string, ChatStore>();
+
 export function useAIChat(params: UseAIChatParams): UseAIChatReturn {
   const {
     entity,
@@ -66,19 +74,38 @@ export function useAIChat(params: UseAIChatParams): UseAIChatReturn {
   // API messages for conversation continuity
   const apiMessagesRef = useRef<ApiMessage[]>([]);
 
-  // Track entity ID to reset conversation when entity changes
-  const entityIdRef = useRef<string | undefined>(undefined);
+  // Track entity ID to save/restore conversation on entity switch
+  const prevEntityIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
-    if (entity?.id !== entityIdRef.current) {
-      entityIdRef.current = entity?.id;
-      // Reset conversation when entity changes
+    const newId = entity?.id;
+    const prevId = prevEntityIdRef.current;
+
+    if (newId === prevId) return;
+
+    // Save current conversation to store
+    if (prevId) {
+      chatStoreMap.set(prevId, {
+        messages: messages,
+        apiMessages: [...apiMessagesRef.current],
+      });
+    }
+
+    // Restore previous conversation or start fresh
+    const stored = newId ? chatStoreMap.get(newId) : undefined;
+    if (stored) {
+      setMessages(stored.messages);
+      apiMessagesRef.current = stored.apiMessages;
+    } else {
       setMessages([]);
-      setStreamingText('');
-      setToolStatus(null);
-      setError(null);
       apiMessagesRef.current = [];
     }
+
+    setStreamingText('');
+    setToolStatus(null);
+    setError(null);
+    prevEntityIdRef.current = newId;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity?.id]);
 
   const sendMessage = useCallback(async (text: string) => {
@@ -141,10 +168,10 @@ export function useAIChat(params: UseAIChatParams): UseAIChatReturn {
             break;
           case 'tool_call_start':
             setToolStatus(
-              chunk.name === 'search_papers' ? 'Semantic Scholar 검색 중...' :
-              chunk.name === 'add_paper' ? '논문 추가 중...' :
-              chunk.name === 'summarize_paper' ? '요약 생성 중...' :
-              '처리 중...'
+              chunk.name === 'search_papers' ? 'Searching Semantic Scholar...' :
+              chunk.name === 'add_paper' ? 'Adding paper...' :
+              chunk.name === 'summarize_paper' ? 'Generating summary...' :
+              'Processing...'
             );
             break;
           case 'tool_result':
@@ -193,7 +220,11 @@ export function useAIChat(params: UseAIChatParams): UseAIChatReturn {
     setToolStatus(null);
     setError(null);
     apiMessagesRef.current = [];
-  }, []);
+    // Also clear from store
+    if (entity?.id) {
+      chatStoreMap.delete(entity.id);
+    }
+  }, [entity?.id]);
 
   const markPaperAdded = useCallback((messageId: string, paperIndex: number) => {
     setMessages((prev) =>

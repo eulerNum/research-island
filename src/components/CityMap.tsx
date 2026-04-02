@@ -215,18 +215,27 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
         onContextMenuRef.current?.({ type: 'road', id: d.id, screenX: _event.clientX, screenY: _event.clientY });
       });
 
-    // Native DOM drag-over/drop for paper drag from sidebar
-    roadGroups.each(function (d) {
-      const el = this as SVGGElement;
+    const roadHitAreas = roadGroups
+      .append('path')
+      .attr('class', 'road-hit')
+      .attr('fill', 'none')
+      .attr('stroke', 'transparent')
+      .attr('stroke-width', 28)
+      .attr('pointer-events', 'stroke')
+      .attr('d', roadPath);
+
+    // Native DOM drag-over/drop on hit areas (must be after hit area creation)
+    roadHitAreas.each(function (d) {
+      const el = this as SVGPathElement;
       el.addEventListener('dragover', (e) => {
         if (e.dataTransfer?.types.includes('application/paper-id')) {
           e.preventDefault();
           e.dataTransfer.dropEffect = 'copy';
-          d3.select(el).select('.road').attr('stroke-width', 5).attr('filter', 'url(#road-glow)');
+          d3.select(el.parentNode as Element).select('.road').attr('stroke-width', 5).attr('filter', 'url(#road-glow)');
         }
       });
       el.addEventListener('dragleave', () => {
-        d3.select(el).select('.road').attr('stroke-width', 2.5).attr('filter', null);
+        d3.select(el.parentNode as Element).select('.road').attr('stroke-width', 2.5).attr('filter', null);
       });
       el.addEventListener('drop', (e) => {
         e.preventDefault();
@@ -234,17 +243,9 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
         if (paperId) {
           onPaperDropOnRoadRef.current?.(paperId, d.id);
         }
-        d3.select(el).select('.road').attr('stroke-width', 2.5).attr('filter', null);
+        d3.select(el.parentNode as Element).select('.road').attr('stroke-width', 2.5).attr('filter', null);
       });
     });
-
-    roadGroups
-      .append('path')
-      .attr('class', 'road-hit')
-      .attr('fill', 'none')
-      .attr('stroke', 'transparent')
-      .attr('stroke-width', 28)
-      .attr('d', roadPath);
 
     roadGroups
       .append('path')

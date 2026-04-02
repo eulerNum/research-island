@@ -5,11 +5,13 @@ import { useToolbar } from '../hooks/useToolbar';
 import Toolbar from '../components/Toolbar';
 import CityMap from '../components/CityMap';
 import DetailPanel from '../components/DetailPanel';
+import AIChatPanel from '../components/AIChatPanel';
 import PromptDialog from '../components/PromptDialog';
 import ContextMenu from '../components/ContextMenu';
 import type { ContextMenuItem, ContextMenuPaletteItem } from '../components/ContextMenu';
 import type { CityMapContextMenuEvent } from '../components/CityMap';
 import type { ToolbarMode } from '../hooks/useToolbar';
+import PaperStudyPanel from '../components/PaperStudyPanel';
 
 const DETAIL_MODES: ToolbarMode[] = ['select', 'add-city', 'road-connect'];
 
@@ -30,6 +32,8 @@ export default function IslandDetailPage() {
     return param;
   });
   const [highlightedPaperId, setHighlightedPaperId] = useState<string | null>(null);
+  const [studyPaperId, setStudyPaperId] = useState<string | null>(null);
+  const [aiChatOpen, setAiChatOpen] = useState(false);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; items: ContextMenuItem[] } | null>(null);
   const [promptDialog, setPromptDialog] = useState<{
     title: string;
@@ -222,6 +226,40 @@ export default function IslandDetailPage() {
     ? ctx.mapData.roads.find((r) => r.id === selectedRoadId)
     : undefined;
 
+  // AI Chat helper data
+  const selectedRoadDisplayName = (() => {
+    if (!selectedRoad) return '';
+    const src = island.cities.find((c) => c.id === selectedRoad.sourceCityId)?.name ?? '?';
+    const tgt = island.cities.find((c) => c.id === selectedRoad.targetCityId)?.name ?? '?';
+    return selectedRoad.label ? `${src}\u2192${tgt}: ${selectedRoad.label}` : `${src}\u2192${tgt}`;
+  })();
+
+  const chatBridgeList = ctx.mapData.bridges.map((b) => ({
+    id: b.id,
+    sourceLabel: islandNameMap.get(b.sourceIslandId) ?? '?',
+    targetLabel: islandNameMap.get(b.targetIslandId) ?? '?',
+    label: b.label ?? '',
+  }));
+
+  const chatRoadList = ctx.mapData.roads.map((r) => ({
+    id: r.id,
+    sourceLabel: cityNameMap.get(r.sourceCityId) ?? '?',
+    targetLabel: cityNameMap.get(r.targetCityId) ?? '?',
+    label: r.label ?? '',
+  }));
+
+  const selectedRoadPapers = selectedRoad
+    ? ctx.mapData.papers.filter((p) => selectedRoad.paperIds.includes(p.id))
+    : [];
+
+  const selectedRoadGaps = selectedRoad
+    ? ctx.mapData.gaps.filter((g) => selectedRoad.gapIds.includes(g.id))
+    : [];
+
+  const studyPaper = studyPaperId
+    ? ctx.mapData.papers.find((p) => p.id === studyPaperId)
+    : undefined;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <Toolbar
@@ -282,6 +320,25 @@ export default function IslandDetailPage() {
             onPaperDropOnRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
           />
         </div>
+        {selectedRoad && aiChatOpen && (
+          <AIChatPanel
+            entity={selectedRoad}
+            entityType="road"
+            entityDisplayName={selectedRoadDisplayName}
+            sourceLabel={island.cities.find((c) => c.id === selectedRoad.sourceCityId)?.name ?? 'Source'}
+            targetLabel={island.cities.find((c) => c.id === selectedRoad.targetCityId)?.name ?? 'Target'}
+            existingPapers={selectedRoadPapers}
+            gaps={selectedRoadGaps}
+            allBridges={chatBridgeList}
+            allRoads={chatRoadList}
+            onAddPaper={(paper) => ctx.addPaper(paper)}
+            onAddPaperToBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
+            onAddPaperToRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
+            onUpdatePaper={ctx.updatePaper}
+            onShowClaudeSettings={() => {}}
+            onClose={() => setAiChatOpen(false)}
+          />
+        )}
         {selectedRoad && (
           <DetailPanel
             road={selectedRoad}
@@ -313,7 +370,24 @@ export default function IslandDetailPage() {
             onNavigateToRoad={handleNavigateToRoad}
             onAddPaperToBridge={(paperId, bridgeId) => ctx.addPaperToBridge(paperId, bridgeId)}
             onAddPaperToRoad={(paperId, roadId) => ctx.addPaperToRoad(paperId, roadId)}
-            onClose={() => { setSelectedRoadId(null); setHighlightedPaperId(null); }}
+            onClose={() => { setSelectedRoadId(null); setHighlightedPaperId(null); setAiChatOpen(false); }}
+            aiChatOpen={aiChatOpen}
+            onToggleAIChat={() => setAiChatOpen((v) => !v)}
+            onStudyPaper={(paperId) => { setStudyPaperId(paperId); setHighlightedPaperId(paperId); }}
+          />
+        )}
+        {studyPaper && (
+          <PaperStudyPanel
+            paper={studyPaper}
+            allBridges={ctx.mapData.bridges}
+            allRoads={ctx.mapData.roads}
+            islandNameMap={islandNameMap}
+            cityNameMap={cityNameMap}
+            allIslandCityMap={cityIslandMap}
+            onUpdatePaper={ctx.updatePaper}
+            onNavigateToBridge={handleNavigateToBridge}
+            onNavigateToRoad={handleNavigateToRoad}
+            onClose={() => { setStudyPaperId(null); setHighlightedPaperId(null); }}
           />
         )}
       </div>

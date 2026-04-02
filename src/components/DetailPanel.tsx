@@ -1,15 +1,10 @@
 import { useState, useMemo, useCallback, useRef } from 'react';
 import type { Bridge, Road, Paper, ResearchGap } from '../services/types';
-import { getClaudeConfig, suggestPapers } from '../services/aiService';
-import type { AISuggestion } from '../services/aiService';
 import { getGitHubConfig } from '../services/githubService';
 import { uploadFigure } from '../services/figureService';
-import { generateId } from '../utils/idGenerator';
 import GapMemo from './GapMemo';
 import PaperForm from './PaperForm';
 import FigureLightbox from './FigureLightbox';
-import ClaudeSettings from './ClaudeSettings';
-import AIChatPanel from './AIChatPanel';
 
 interface CrossRef {
   type: 'bridge' | 'road';
@@ -45,6 +40,9 @@ interface DetailPanelProps {
   onAddPaperToBridge?: (paperId: string, bridgeId: string) => void;
   onAddPaperToRoad?: (paperId: string, roadId: string) => void;
   onClose: () => void;
+  aiChatOpen?: boolean;
+  onToggleAIChat?: () => void;
+  onStudyPaper?: (paperId: string) => void;
 }
 
 export default function DetailPanel({
@@ -58,10 +56,7 @@ export default function DetailPanel({
   highlightedPaperId,
   islandNameMap,
   cityNameMap,
-  sourceLabel,
-  targetLabel,
   onAddPaper,
-  onAddPaperWithId,
   onUpdatePaper,
   onAddGap,
   onDeleteGap,
@@ -70,20 +65,16 @@ export default function DetailPanel({
   onHighlightPaper,
   onNavigateToBridge,
   onNavigateToRoad,
-  onAddPaperToBridge,
-  onAddPaperToRoad,
   onClose,
+  aiChatOpen,
+  onToggleAIChat,
+  onStudyPaper,
 }: DetailPanelProps) {
   const [showPaperForm, setShowPaperForm] = useState(false);
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
   const [pinnedPaperId, setPinnedPaperId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
-  const [aiSuggestions, setAiSuggestions] = useState<AISuggestion[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [showClaudeSettings, setShowClaudeSettings] = useState(false);
   const [panelWidth, setPanelWidth] = useState(420);
-  const [chatExpanded, setChatExpanded] = useState(false);
   const resizingRef = useRef(false);
 
   const handleResizeStart = useCallback((e: React.MouseEvent) => {
@@ -140,25 +131,6 @@ export default function DetailPanel({
     return map;
   }, [linkedPapers, allBridges, allRoads, allIslandCityMap, islandNameMap, cityNameMap, bridge, road]);
 
-  // Build bridge/road label lists for AI chat context
-  const chatBridgeList = useMemo(() =>
-    allBridges.map((b) => ({
-      id: b.id,
-      sourceLabel: islandNameMap?.get(b.sourceIslandId) ?? '?',
-      targetLabel: islandNameMap?.get(b.targetIslandId) ?? '?',
-      label: b.label ?? '',
-    })),
-  [allBridges, islandNameMap]);
-
-  const chatRoadList = useMemo(() =>
-    allRoads.map((r) => ({
-      id: r.id,
-      sourceLabel: cityNameMap?.get(r.sourceCityId) ?? '?',
-      targetLabel: cityNameMap?.get(r.targetCityId) ?? '?',
-      label: r.label ?? '',
-    })),
-  [allRoads, cityNameMap]);
-
   if (!entity) return null;
 
   const gapIds = entity.gapIds;
@@ -211,10 +183,29 @@ export default function DetailPanel({
       {/* Header */}
       <div style={{ padding: '16px 16px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h3 style={{ fontSize: '1rem', margin: 0 }}>
+        <h3 style={{ fontSize: '1rem', margin: 0, flex: 1, minWidth: 0 }}>
           <span style={{ color: dirColor }}>{entity.direction === 'forward' ? '\u2192' : '\u2190'}</span>{' '}
           {entityDisplayName}
         </h3>
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+          {onToggleAIChat && (
+            <button
+              onClick={onToggleAIChat}
+              title="AI Chat"
+              style={{
+                padding: '2px 8px',
+                background: aiChatOpen ? 'var(--text-ai)' : 'var(--bg-ai)',
+                color: aiChatOpen ? '#fff' : 'var(--text-ai)',
+                border: '1px solid var(--border-ai)',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+              }}
+            >
+              AI
+            </button>
+          )}
         <button
           onClick={onClose}
           style={{
@@ -227,35 +218,16 @@ export default function DetailPanel({
         >
           &times;
         </button>
+        </div>
       </div>
       </div>
-
-      {/* AI Chat Panel — top of sidebar */}
-      {onAddPaperWithId && onAddPaperToBridge && onAddPaperToRoad && onUpdatePaper && (
-        <AIChatPanel
-          entity={entity}
-          entityType={bridge ? 'bridge' : 'road'}
-          sourceLabel={sourceLabel ?? 'Source'}
-          targetLabel={targetLabel ?? 'Target'}
-          existingPapers={linkedPapers}
-          gaps={gaps.filter((g) => gapIds.includes(g.id))}
-          allBridges={chatBridgeList}
-          allRoads={chatRoadList}
-          onAddPaper={onAddPaperWithId}
-          onAddPaperToBridge={onAddPaperToBridge}
-          onAddPaperToRoad={onAddPaperToRoad}
-          onUpdatePaper={onUpdatePaper}
-          onShowClaudeSettings={() => setShowClaudeSettings(true)}
-          onExpandChange={setChatExpanded}
-        />
-      )}
 
       {/* Scrollable content area — papers, gaps, suggestions */}
       <div style={{
         flex: 1,
         overflowY: 'auto',
         padding: '0 16px 16px',
-        display: chatExpanded ? 'none' : 'flex',
+        display: 'flex',
         flexDirection: 'column',
         gap: 16,
       }}>
@@ -287,6 +259,7 @@ export default function DetailPanel({
                 }}
                 onMouseEnter={() => { if (!pinnedPaperId) onHighlightPaper?.(paper.id); }}
                 onMouseLeave={() => { if (!pinnedPaperId) onHighlightPaper?.(null); }}
+                onDoubleClick={() => onStudyPaper?.(paper.id)}
               >
                 <div style={{ fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ flex: 1 }}>
@@ -547,7 +520,7 @@ export default function DetailPanel({
           })}
         </div>
 
-        {/* Add/Edit paper — no inline form, buttons open modal */}
+        {/* Add/Edit paper */}
         {!editingPaper ? (
           <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
             <button
@@ -564,164 +537,9 @@ export default function DetailPanel({
             >
               + Add Paper
             </button>
-            <button
-              onClick={async () => {
-                const config = getClaudeConfig();
-                if (!config) {
-                  setShowClaudeSettings(true);
-                  return;
-                }
-                setAiLoading(true);
-                setAiError(null);
-                setAiSuggestions([]);
-                try {
-                  const linkedGaps = gaps.filter((g) => (entity?.gapIds ?? []).includes(g.id));
-                  const result = await suggestPapers(
-                    config,
-                    entity!,
-                    sourceLabel ?? 'Source',
-                    targetLabel ?? 'Target',
-                    linkedPapers,
-                    linkedGaps,
-                  );
-                  setAiSuggestions(result);
-                } catch (e) {
-                  setAiError((e as Error).message);
-                } finally {
-                  setAiLoading(false);
-                }
-              }}
-              disabled={aiLoading}
-              style={{
-                padding: '6px 12px',
-                background: aiLoading ? 'var(--btn-secondary-bg)' : 'var(--bg-ai)',
-                border: '1px dashed var(--border-ai)',
-                borderRadius: 4,
-                cursor: aiLoading ? 'default' : 'pointer',
-                fontSize: '0.8rem',
-                color: 'var(--text-ai)',
-              }}
-            >
-              {aiLoading ? 'AI 검색 중...' : 'AI 논문 제안'}
-            </button>
           </div>
         ) : null}
 
-        {/* AI Suggestion Results */}
-        {aiError && (
-          <div style={{
-            marginTop: 8,
-            padding: '8px 10px',
-            background: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: 6,
-            fontSize: '0.8rem',
-            color: '#dc2626',
-          }}>
-            {aiError}
-            <button
-              onClick={() => setShowClaudeSettings(true)}
-              style={{ marginLeft: 8, fontSize: '0.75rem', color: 'var(--text-ai)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-            >
-              API 설정
-            </button>
-          </div>
-        )}
-        {aiSuggestions.length > 0 && (
-          <div style={{ marginTop: 8 }}>
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-ai)', fontWeight: 600, marginBottom: 6 }}>
-              AI 제안 ({aiSuggestions.length})
-            </div>
-            {aiSuggestions.map((sug, idx) => (
-              <div
-                key={idx}
-                style={{
-                  padding: '8px 10px',
-                  background: 'var(--bg-ai)',
-                  borderRadius: 6,
-                  border: '1px solid var(--border-ai)',
-                  fontSize: '0.8rem',
-                  marginBottom: 6,
-                }}
-              >
-                <div style={{ fontWeight: 'bold' }}>
-                  {sug.title} <span style={{ fontWeight: 'normal', color: 'var(--text-tertiary)' }}>({sug.year})</span>
-                </div>
-                {sug.authors.length > 0 && (
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 2 }}>
-                    {sug.authors.join(', ')}
-                  </div>
-                )}
-                {sug.journal && (
-                  <div style={{ color: 'var(--text-tertiary)', fontSize: '0.7rem', fontStyle: 'italic', marginTop: 1 }}>
-                    {sug.journal}
-                  </div>
-                )}
-                <div style={{ color: 'var(--text-ai)', fontSize: '0.75rem', marginTop: 4 }}>
-                  {sug.relevance}
-                </div>
-                {sug.addressesGap && sug.addressesGap !== 'null' && (
-                  <div style={{ color: '#b45309', fontSize: '0.7rem', marginTop: 2 }}>
-                    Gap: {sug.addressesGap}
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                  <button
-                    onClick={() => {
-                      const paper: Paper = {
-                        id: generateId(),
-                        title: sug.title,
-                        authors: sug.authors,
-                        year: sug.year,
-                        journal: sug.journal,
-                        url: sug.url,
-                        comment: sug.relevance,
-                        source: 'manual',
-                        createdAt: new Date().toISOString(),
-                      };
-                      onAddPaper(paper);
-                      setAiSuggestions((prev) => prev.filter((_, i) => i !== idx));
-                    }}
-                    style={{
-                      padding: '3px 10px',
-                      background: 'var(--accent-forward)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    추가
-                  </button>
-                  <button
-                    onClick={() => setAiSuggestions((prev) => prev.filter((_, i) => i !== idx))}
-                    style={{
-                      padding: '3px 10px',
-                      background: 'var(--btn-secondary-bg)',
-                      border: 'none',
-                      borderRadius: 4,
-                      cursor: 'pointer',
-                      fontSize: '0.75rem',
-                    }}
-                  >
-                    무시
-                  </button>
-                  {sug.url && (
-                    <a
-                      href={sug.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{ fontSize: '0.7rem', color: 'var(--accent-forward)', alignSelf: 'center' }}
-                    >
-                      DOI
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       </div>{/* end scrollable content area */}
@@ -780,9 +598,6 @@ export default function DetailPanel({
           onChangeIndex={(i) => setLightbox({ ...lightbox, index: i })}
           onClose={() => setLightbox(null)}
         />
-      )}
-      {showClaudeSettings && (
-        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
       )}
     </aside>
   );

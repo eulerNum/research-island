@@ -193,7 +193,8 @@ ${roadList}
 - When presenting search results, briefly explain each paper's relevance.
 - When the user says "추가" or "add", use the add_paper tool.
 - Keep responses concise but informative.
-- Always consider cross-disciplinary papers. A bridge between two topics can be informed by research from ANY field.`;
+- Always consider cross-disciplinary papers. A bridge between two topics can be informed by research from ANY field.
+- **IMPORTANT: After deep_search or search_papers, NEVER automatically call add_paper.** The search results will be shown as interactive cards with "추가" buttons. The user will decide which papers to add. Just summarize the results — do NOT add any papers unless the user explicitly asks.`;
 }
 
 // ─── Convert our messages to Gemini format ─────────────────
@@ -258,7 +259,7 @@ async function executeTool(
 ): Promise<ToolExecResult> {
   switch (name) {
     case 'search_papers': {
-      callbacks.onToolStatus('Semantic Scholar 검색 중...');
+      callbacks.onToolStatus('Searching Semantic Scholar...');
       try {
         const query = input.query as string;
         const limit = (input.limit as number) || 5;
@@ -286,7 +287,7 @@ async function executeTool(
     }
 
     case 'add_paper': {
-      callbacks.onToolStatus('논문 추가 중...');
+      callbacks.onToolStatus('Adding paper...');
       const paper: Paper = {
         id: crypto.randomUUID(),
         title: input.title as string,
@@ -294,7 +295,8 @@ async function executeTool(
         year: (input.year as number) || new Date().getFullYear(),
         journal: (input.journal as string) || undefined,
         abstract: (input.abstract as string) || undefined,
-        url: (input.url as string) || undefined,
+        url: (input.url as string)
+          || (input.semantic_scholar_id ? `https://www.semanticscholar.org/paper/${input.semantic_scholar_id}` : undefined),
         semanticScholarId: (input.semantic_scholar_id as string) || undefined,
         source: input.semantic_scholar_id ? 'semantic_scholar' : 'manual',
         createdAt: new Date().toISOString(),
@@ -326,7 +328,7 @@ async function executeTool(
     }
 
     case 'deep_search': {
-      callbacks.onToolStatus('깊은 탐색 시작...');
+      callbacks.onToolStatus('Starting deep search...');
       try {
         const existingPaperIds = new Set(
           context.existingPapers.map((p) => p.semanticScholarId).filter((id): id is string => !!id),
@@ -363,7 +365,7 @@ async function executeTool(
     }
 
     case 'summarize_paper': {
-      callbacks.onToolStatus('논문 요약 생성 중...');
+      callbacks.onToolStatus('Generating summary...');
       try {
         const title = input.title as string;
         const abstract = (input.abstract as string) || '';

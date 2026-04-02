@@ -19,6 +19,12 @@ interface S2Paper {
 }
 
 function toPaper(s2: S2Paper): Paper {
+  // Prefer DOI URL over S2 page URL
+  const doi = s2.externalIds?.DOI;
+  const url = doi
+    ? `https://doi.org/${doi}`
+    : s2.url || undefined;
+
   return {
     id: crypto.randomUUID(),
     semanticScholarId: s2.paperId,
@@ -27,7 +33,7 @@ function toPaper(s2: S2Paper): Paper {
     year: s2.year,
     abstract: s2.abstract ?? undefined,
     citationCount: s2.citationCount,
-    url: s2.url,
+    url,
     source: 'semantic_scholar',
     createdAt: new Date().toISOString(),
   };
