@@ -17,6 +17,7 @@ export interface DeepSearchContext {
   entityLabel: string;
   seedPapers: Paper[];
   existingPaperIds: Set<string>;
+  yearFrom?: number;
 }
 
 export interface DeepSearchScores {
@@ -347,10 +348,14 @@ function phase4CheapCompression(
 
   const keywords = extractKeywords(ctx);
   const currentYear = new Date().getFullYear();
-  const oldestSeedYear = ctx.seedPapers.length > 0
-    ? Math.min(...ctx.seedPapers.map((p) => p.year))
-    : currentYear - 20;
-  const yearCutoff = Math.min(oldestSeedYear, currentYear - 20);
+  const yearCutoff = ctx.yearFrom
+    ? ctx.yearFrom
+    : (() => {
+        const oldestSeedYear = ctx.seedPapers.length > 0
+          ? Math.min(...ctx.seedPapers.map((p) => p.year))
+          : currentYear - 20;
+        return Math.min(oldestSeedYear, currentYear - 20);
+      })();
 
   // Step 1: Year filter
   let filtered = candidates.map((paper) => {

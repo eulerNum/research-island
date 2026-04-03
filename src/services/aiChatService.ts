@@ -97,10 +97,12 @@ const TOOL_DECLARATIONS: ToolDeclaration[] = [
   },
   {
     name: 'deep_search',
-    description: 'Perform a deep 5-phase search for papers relevant to the current bridge/road. Use this when the user asks for thorough/deep search, or says "깊은 탐색", "자세히 찾아줘", "논문 많이 찾아줘". This takes longer (30-60 seconds) but finds more papers through citation chains, multi-angle keywords, recommendations, and author tracking.',
+    description: 'Perform a deep 5-phase search for papers relevant to the current bridge/road. Use this when the user asks for thorough/deep search, or says "깊은 탐색", "자세히 찾아줘", "논문 많이 찾아줘". This takes longer (30-60 seconds) but finds more papers through citation chains, multi-angle keywords, recommendations, and author tracking. If the user mentions a year range like "최근 5년", "2020년 이후", "recent 3 years", set year_from accordingly (e.g. current year minus 5).',
     parameters: {
       type: 'object',
-      properties: {},
+      properties: {
+        year_from: { type: 'number', description: 'Only include papers published this year or later (e.g. 2021 for last 5 years). Omit to include all years.' },
+      },
       required: [],
     },
   },
@@ -285,6 +287,7 @@ async function executeTool(
             entityLabel: context.entityLabel,
             seedPapers: context.existingPapers,
             existingPaperIds,
+            yearFrom: (input.year_from as number) || undefined,
           },
           (progress) => {
             callbacks.onToolStatus(`[Phase ${progress.phase}] ${progress.status}`);
