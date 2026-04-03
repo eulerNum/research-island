@@ -21,8 +21,8 @@ No test runner is configured yet.
 - React Router v7 for client-side routing
 - GitHub API for cloud persistence (PAT auth)
 - Google Sheets sync via n8n webhooks
-- localStorage for local persistence
-- Vercel for deployment
+- IndexedDB for local persistence (NOT localStorage — 5MB 한도 초과 문제로 전환)
+- Vercel for deployment (git push → webhook → auto build, 백업: `npx vercel --prod`)
 
 ## Architecture
 
@@ -74,6 +74,12 @@ Interactive web app that visualizes food-science research as an island-bridge-ci
 - Cache busting: URL `?t=timestamp` on all GitHub API calls (NOT `cache: 'no-store'` or `If-None-Match` — these cause CORS/fetch failures)
 - Base64 encoding: `TextEncoder`/`TextDecoder` based (NOT `btoa`/`atob` with `escape`/`unescape` — breaks on large or Korean-heavy payloads)
 
+**Vercel deployment**:
+- git push → GitHub webhook → Vercel 자동 빌드
+- `vercel.json`: SPA rewrite만 (ignoreCommand 제거됨 — 모든 push에서 빌드)
+- webhook 장애 시: `npx vercel --prod`로 로컬 직접 배포
+- 전체 데이터 흐름은 `storage-flow.md` 참조
+
 ## File Structure
 
 ```
@@ -112,7 +118,7 @@ src/
 │   └── ThemeContext.ts
 ├── services/
 │   ├── types.ts        # Core type definitions
-│   ├── mapService.ts   # localStorage CRUD + in-memory cache + Undo/Redo
+│   ├── mapService.ts   # IndexedDB CRUD + in-memory cache + Undo/Redo
 │   ├── mapIndexService.ts # GitHub maps-index.json CRUD + PIN hash
 │   ├── githubService.ts   # GitHub Contents API + Blob API + conflict detection
 │   ├── aiService.ts       # Claude API (suggestPapers, summarizePaper — legacy)

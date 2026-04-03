@@ -209,19 +209,12 @@ export default function PaperForm({ initialPaper, onSubmit, onCancel }: PaperFor
         <input value={journal} onChange={(e) => setJournal(e.target.value)} style={inputStyle} />
       </div>
       <div>
-        <label style={labelStyle}>Description</label>
-        <textarea
-          value={abstract}
-          onChange={(e) => setAbstract(e.target.value)}
-          style={{ ...inputStyle, minHeight: 50, resize: 'vertical' }}
-        />
-      </div>
-      <div>
         <label style={labelStyle}>My Note</label>
-        <textarea
+        <input
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          style={{ ...inputStyle, minHeight: 40, resize: 'vertical' }}
+          style={inputStyle}
+          placeholder="e.g. HCI, AI, Visualization"
         />
       </div>
       <div>

@@ -362,14 +362,8 @@ export default function DetailPanel({
                     {paper.journal}
                   </div>
                 )}
-                {paper.abstract && (
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginTop: 4 }}>
-                    {paper.abstract.slice(0, 120)}
-                    {paper.abstract.length > 120 ? '...' : ''}
-                  </div>
-                )}
                 {paper.comment && (
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 4, fontStyle: 'italic', borderLeft: '2px solid var(--accent-forward)', paddingLeft: 6 }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 4, fontStyle: 'italic' }}>
                     {paper.comment}
                   </div>
                 )}
