@@ -218,7 +218,7 @@ export default function PaperStudyPanel({
         <h3 style={sectionHeader}>AI Summary</h3>
         {paper.aiSummary ? (
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-            {paper.aiSummary}
+            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(paper.aiSummary) }} />
             <div style={{ marginTop: 8 }}>
               <button onClick={handleGenerateSummary} disabled={aiLoading} style={smallBtn}>
                 {aiLoading ? '...' : 'Regenerate'}

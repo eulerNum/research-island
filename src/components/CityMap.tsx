@@ -145,6 +145,16 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
     });
 
     const cityMap = new Map(cities.map((c) => [c.city.id, c]));
+    const roadById = new Map(roads.map((r) => [r.id, r]));
+
+    // City → connected road IDs (for efficient drag updates)
+    const cityToRoads = new Map<string, string[]>();
+    for (const r of roads) {
+      if (!cityToRoads.has(r.sourceCityId)) cityToRoads.set(r.sourceCityId, []);
+      if (!cityToRoads.has(r.targetCityId)) cityToRoads.set(r.targetCityId, []);
+      cityToRoads.get(r.sourceCityId)!.push(r.id);
+      cityToRoads.get(r.targetCityId)!.push(r.id);
+    }
 
     // Compute per-road curve offset for parallel roads between the same cities
     const pairKey = (a: string, b: string) => [a, b].sort().join('|');
@@ -433,17 +443,19 @@ const CityMap = forwardRef<SVGSVGElement, CityMapProps>(function CityMap({
           'transform',
           `translate(${d.x},${d.y})`,
         );
-        // Update connected roads, labels, and badges
-        g.selectAll<SVGPathElement, Road>('.road-hit').attr('d', roadPath);
-        g.selectAll<SVGPathElement, Road>('.road').attr('d', roadPath);
-        g.selectAll<SVGTextElement, Road>('.road-label').each(function (rd) {
+        // Only update roads connected to the dragged city
+        const connectedIds = cityToRoads.get(d.city.id) ?? [];
+        for (const roadId of connectedIds) {
+          const rd = roadById.get(roadId);
+          if (!rd) continue;
+          const roadGroup = g.select<SVGGElement>(`.road-group-${roadId}`);
+          roadGroup.select<SVGPathElement>('.road-hit').attr('d', roadPath(rd));
+          roadGroup.select<SVGPathElement>('.road').attr('d', roadPath(rd));
           const mid = roadMidpoint(rd);
-          d3.select(this).attr('x', mid.x).attr('y', mid.y);
-        });
-        g.selectAll<SVGGElement, Road>('.road-badge').each(function (rd) {
-          const mid = roadMidpoint(rd);
-          d3.select(this).attr('transform', `translate(${mid.x},${mid.y + 12})`);
-        });
+          roadGroup.select<SVGTextElement>('.road-label').attr('x', mid.x).attr('y', mid.y);
+          roadGroup.select<SVGGElement>('.road-badge').attr('transform', `translate(${mid.x},${mid.y + 12})`);
+          roadCurveHandles.filter((rh) => rh.id === roadId).attr('cx', mid.x).attr('cy', mid.y);
+        }
       })
       .on('end', (_event, d) => {
         onCityDragEndRef.current(d.city.id, { x: d.x, y: d.y });

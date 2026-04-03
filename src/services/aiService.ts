@@ -7,17 +7,36 @@ export async function summarizePaper(paper: Paper): Promise<string> {
     ? `Abstract:\n${paper.abstract}`
     : '(No abstract available — summarize based on title and metadata only)';
 
-  const prompt = `You are a research assistant. Summarize the following academic paper in 3-5 sentences.
-Cover: (1) main research question, (2) methodology, (3) key findings, (4) significance.
-Write in English, concise and academic tone.
+  const prompt = `You are a research assistant helping a food science researcher study academic papers.
+Analyze the following paper and return a structured summary in EXACTLY this markdown format (300-500 words total):
 
+## 한줄 요약
+[핵심 기여를 1문장으로 — 한국어]
+
+## 연구 프레임
+- **대상(Subject)**: 무엇을/누구를 연구했는가 (한국어, 핵심 용어는 영어 병기)
+- **과업(Task)**: 어떤 문제 또는 목표를 다루는가 (한국어)
+- **시스템(System)**: 어떤 방법론/도구/모델/절차를 사용했는가 (한국어, 기법명은 영어 원문)
+- **검증(Validation)**: 어떻게 효과를 측정하거나 검증했는가 (한국어)
+
+## 주요 발견
+- [결과 bullet 2~4개, 수치/통계 포함 가능, 한국어]
+
+## 한계 & 후속 연구
+[저자가 인정한 한계점과 열린 연구 질문 — 한국어]
+
+## 인용 포인트
+> [영어 원문에서 그대로 인용할 수 있는 핵심 문장 1~2개]
+
+---
+Paper info:
 Title: ${paper.title}
 Authors: ${paper.authors.join(', ')}
 Year: ${paper.year}
 Journal: ${paper.journal ?? 'Unknown'}
 ${abstractSection}
 
-Return ONLY the summary text, no formatting or headers.`;
+Return ONLY the markdown above. Do not add any text before or after.`;
 
-  return llmGenerate('summary', [{ role: 'user', content: prompt }], { maxTokens: 512 });
+  return llmGenerate('summary', [{ role: 'user', content: prompt }], { maxTokens: 900 });
 }
