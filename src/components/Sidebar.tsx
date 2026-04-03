@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { ResearchMap } from '../services/types';
 import { useMapDataContext } from '../contexts/MapDataContext';
 import GitHubSettings from './GitHubSettings';
-import ClaudeSettings from './ClaudeSettings';
+import AISettings from './AISettings';
 import { getGitHubConfig } from '../services/githubService';
 
 interface SidebarProps {
@@ -557,7 +557,7 @@ export default function Sidebar({ data, highlightedPaperId, onHighlightPaper, on
         <GitHubSettings onClose={() => setShowGitHubSettings(false)} />
       )}
       {showClaudeSettings && (
-        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
+        <AISettings onClose={() => setShowClaudeSettings(false)} />
       )}
     </aside>
   );

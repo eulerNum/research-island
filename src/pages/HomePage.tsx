@@ -12,7 +12,7 @@ import { generateId } from '../utils/idGenerator';
 import { useThemeContext } from '../contexts/ThemeContext';
 import GitHubSettings from '../components/GitHubSettings';
 import SheetsSettings from '../components/SheetsSettings';
-import ClaudeSettings from '../components/ClaudeSettings';
+import AISettings from '../components/AISettings';
 import PinDialog from '../components/PinDialog';
 import NewMapDialog from '../components/NewMapDialog';
 
@@ -335,7 +335,7 @@ export default function HomePage() {
         <SheetsSettings onClose={() => setShowSheetsSettings(false)} />
       )}
       {showClaudeSettings && (
-        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
+        <AISettings onClose={() => setShowClaudeSettings(false)} />
       )}
       {showNewMap && (
         <NewMapDialog

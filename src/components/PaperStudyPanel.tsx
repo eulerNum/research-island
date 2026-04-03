@@ -2,9 +2,9 @@ import { useState, useRef, useCallback, useMemo } from 'react';
 import type { Paper, Bridge, Road } from '../services/types';
 import { getGitHubConfig } from '../services/githubService';
 import { uploadFigure } from '../services/figureService';
-import { getClaudeConfig, summarizePaper } from '../services/aiService';
+import { summarizePaper } from '../services/aiService';
 import FigureLightbox from './FigureLightbox';
-import ClaudeSettings from './ClaudeSettings';
+import AISettings from './AISettings';
 
 interface PaperStudyPanelProps {
   paper: Paper;
@@ -118,15 +118,17 @@ export default function PaperStudyPanel({
 
   // AI summary
   const handleGenerateSummary = useCallback(async () => {
-    const config = getClaudeConfig();
-    if (!config?.apiKey) { setShowClaudeSettings(true); return; }
     setAiLoading(true);
     setAiError(null);
     try {
-      const summary = await summarizePaper(config, paper);
+      const summary = await summarizePaper(paper);
       onUpdatePaper({ ...paper, aiSummary: summary });
     } catch (e) {
-      setAiError((e as Error).message);
+      const msg = (e as Error).message;
+      if (msg.includes('API 키가 설정되지 않았습니다')) {
+        setShowClaudeSettings(true);
+      }
+      setAiError(msg);
     } finally {
       setAiLoading(false);
     }
@@ -396,7 +398,7 @@ export default function PaperStudyPanel({
         />
       )}
       {showClaudeSettings && (
-        <ClaudeSettings onClose={() => setShowClaudeSettings(false)} />
+        <AISettings onClose={() => setShowClaudeSettings(false)} />
       )}
     </aside>
   );

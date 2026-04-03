@@ -1,6 +1,5 @@
 import type { Paper } from './types';
-import { getGeminiConfig, geminiGenerateJSON } from './geminiService';
-import type { GeminiConfig } from './geminiService';
+import { llmGenerateJSON } from './llmService';
 import {
   searchPapers,
   getPaperReferences,
@@ -99,7 +98,6 @@ interface QueryFraming {
 
 async function phase0PseudoSeed(
   ctx: DeepSearchContext,
-  gemini: GeminiConfig,
   existingIds: Set<string>,
   onProgress: (p: DeepSearchProgress) => void,
 ): Promise<{ seeds: Paper[]; framing: QueryFraming }> {
@@ -128,7 +126,7 @@ Extract and return a JSON object (no markdown):
 
   let framing: QueryFraming;
   try {
-    framing = await geminiGenerateJSON<QueryFraming>(gemini, framingPrompt);
+    framing = await llmGenerateJSON<QueryFraming>('deepSearch', [{ role: 'user', content: framingPrompt }]);
   } catch {
     framing = {
       concepts: [ctx.sourceLabel, ctx.targetLabel],
@@ -415,7 +413,6 @@ function phase4CheapCompression(
 async function phase5LLMRerank(
   candidates: CompressedPaper[],
   ctx: DeepSearchContext,
-  gemini: GeminiConfig,
   onProgress: (p: DeepSearchProgress) => void,
 ): Promise<DeepSearchResult[]> {
   const total = candidates.length;
@@ -455,10 +452,10 @@ Return ONLY a JSON array (no markdown):
 Only include papers where at least one dimension score >= 0.4. Omit clearly irrelevant papers.`;
 
     try {
-      const evaluated = await geminiGenerateJSON<{
+      const evaluated = await llmGenerateJSON<{
         index: number; topical: number; methodological: number;
         directApplicability: number; reviewValue: number; reason: string;
-      }[]>(gemini, prompt);
+      }[]>('deepSearch', [{ role: 'user', content: prompt }]);
 
       for (const item of evaluated) {
         if (item.index < 0 || item.index >= chunk.length) continue;
@@ -506,7 +503,6 @@ Only include papers where at least one dimension score >= 0.4. Omit clearly irre
 async function phase6IterativeRefinement(
   firstResults: DeepSearchResult[],
   ctx: DeepSearchContext,
-  gemini: GeminiConfig,
   existingIds: Set<string>,
   onProgress: (p: DeepSearchProgress) => void,
 ): Promise<Paper[]> {
@@ -540,7 +536,7 @@ Return ONLY a JSON array of strings:
 
   let newQueries: string[];
   try {
-    newQueries = await geminiGenerateJSON<string[]>(gemini, prompt);
+    newQueries = await llmGenerateJSON<string[]>('deepSearch', [{ role: 'user', content: prompt }]);
   } catch {
     return [];
   }
@@ -571,11 +567,6 @@ export async function deepSearch(
   ctx: DeepSearchContext,
   onProgress: (p: DeepSearchProgress) => void,
 ): Promise<DeepSearchResult[]> {
-  const gemini = getGeminiConfig();
-  if (!gemini) {
-    throw new Error('Gemini API 키가 설정되지 않았습니다. AI 설정에서 키를 입력해주세요.');
-  }
-
   const existingIds = new Set(ctx.existingPaperIds);
   for (const p of ctx.seedPapers) {
     if (p.semanticScholarId) existingIds.add(p.semanticScholarId);
@@ -591,7 +582,7 @@ export async function deepSearch(
 
     // Still generate framing for Phase 2 queries
     try {
-      const result = await phase0PseudoSeed(ctx, gemini, existingIds, () => {});
+      const result = await phase0PseudoSeed(ctx, existingIds, () => {});
       framing = result.framing;
     } catch {
       framing = {
@@ -607,7 +598,7 @@ export async function deepSearch(
       };
     }
   } else {
-    const result = await phase0PseudoSeed(ctx, gemini, existingIds, onProgress);
+    const result = await phase0PseudoSeed(ctx, existingIds, onProgress);
     seeds = result.seeds;
     framing = result.framing;
   }
@@ -630,15 +621,15 @@ export async function deepSearch(
   const compressed = phase4CheapCompression(allRaw, ctx, onProgress);
 
   // Phase 5: LLM abstract rerank
-  const ranked = await phase5LLMRerank(compressed, ctx, gemini, onProgress);
+  const ranked = await phase5LLMRerank(compressed, ctx, onProgress);
 
   // Phase 6: Iterative refinement (conditional)
-  const iterPapers = await phase6IterativeRefinement(ranked, ctx, gemini, new Set([...ids2, ...collectS2Ids(allRaw)]), onProgress);
+  const iterPapers = await phase6IterativeRefinement(ranked, ctx, new Set([...ids2, ...collectS2Ids(allRaw)]), onProgress);
 
   if (iterPapers.length > 0) {
     // Compress and rerank the new papers too
     const iterCompressed = phase4CheapCompression(iterPapers, ctx, () => {});
-    const iterRanked = await phase5LLMRerank(iterCompressed, ctx, gemini, () => {});
+    const iterRanked = await phase5LLMRerank(iterCompressed, ctx, () => {});
 
     // Merge with first results, re-sort
     const merged = [...ranked, ...iterRanked];

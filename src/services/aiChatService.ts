@@ -1,6 +1,6 @@
 import type { Paper, ResearchGap } from './types';
-import { getGeminiConfig, geminiGenerate, geminiGenerateJSON } from './geminiService';
-import type { GeminiConfig } from './geminiService';
+import { llmGenerate, llmGenerateJSON, llmChatWithTools, buildToolResultMessage, getLLMConfig } from './llmService';
+import type { ToolDeclaration, ToolResult } from './llmService';
 import { searchPapers } from './semanticScholarService';
 import { deepSearch } from './deepSearchService';
 import type { DeepSearchProgress } from './deepSearchService';
@@ -45,26 +45,7 @@ export interface ToolCallbacks {
   onDeepSearchProgress?: (progress: DeepSearchProgress) => void;
 }
 
-// ─── Gemini API types ──────────────────────────────────────
-
-interface GeminiPart {
-  text?: string;
-  functionCall?: { name: string; args: Record<string, unknown> };
-  functionResponse?: { name: string; response: Record<string, unknown> };
-}
-
-interface GeminiContent {
-  role: 'user' | 'model';
-  parts: GeminiPart[];
-}
-
-interface GeminiFunctionDeclaration {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
-}
-
-// ─── ApiMessage: our internal format (maps to Gemini contents) ───
+// ─── ApiMessage: our internal format ──────────────────────
 
 export interface ApiMessage {
   role: 'user' | 'assistant';
@@ -82,9 +63,9 @@ export type StreamChunk =
   | { type: 'done'; fullText: string; paperCards: PaperCard[] }
   | { type: 'error'; message: string };
 
-// ─── Tool definitions (Gemini format) ──────────────────────
+// ─── Tool definitions (provider-neutral) ──────────────────
 
-const FUNCTION_DECLARATIONS: GeminiFunctionDeclaration[] = [
+const TOOL_DECLARATIONS: ToolDeclaration[] = [
   {
     name: 'search_papers',
     description: 'Search Semantic Scholar for academic papers matching a query. Use this when the user asks to find papers related to a topic, bridge, or research question.',
@@ -197,49 +178,13 @@ ${roadList}
 - **IMPORTANT: After deep_search or search_papers, NEVER automatically call add_paper.** The search results will be shown as interactive cards with "추가" buttons. The user will decide which papers to add. Just summarize the results — do NOT add any papers unless the user explicitly asks.`;
 }
 
-// ─── Convert our messages to Gemini format ─────────────────
+// ─── Convert our messages to initial conversation format ──
 
-function toGeminiContents(apiMessages: ApiMessage[]): GeminiContent[] {
+function toInitialContents(apiMessages: ApiMessage[]): { role: string; parts: { text: string }[] }[] {
   return apiMessages.map((msg) => ({
-    role: msg.role === 'assistant' ? 'model' as const : 'user' as const,
+    role: msg.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: msg.content }],
   }));
-}
-
-// ─── Gemini API call (non-streaming for simplicity with tool use) ───
-
-interface GeminiResponse {
-  candidates?: {
-    content?: { parts?: GeminiPart[]; role?: string };
-    finishReason?: string;
-  }[];
-}
-
-async function callGemini(
-  config: GeminiConfig,
-  contents: GeminiContent[],
-  systemPrompt: string,
-): Promise<GeminiResponse> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${config.apiKey}`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents,
-      tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
-      systemInstruction: { parts: [{ text: systemPrompt }] },
-      generationConfig: { temperature: 0.4 },
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    const msg = (err as { error?: { message?: string } }).error?.message;
-    throw new Error(msg ?? `Gemini API error: ${res.status}`);
-  }
-
-  return (await res.json()) as GeminiResponse;
 }
 
 // ─── Tool execution ────────────────────────────────────────
@@ -255,7 +200,6 @@ async function executeTool(
   input: Record<string, unknown>,
   context: ChatContext,
   callbacks: ToolCallbacks,
-  config: GeminiConfig,
 ): Promise<ToolExecResult> {
   switch (name) {
     case 'search_papers': {
@@ -310,10 +254,10 @@ async function executeTool(
         callbacks.onAddPaperToRoad(actualId, context.entityId);
       }
 
-      // Auto-classify to other bridges using Gemini
+      // Auto-classify to other bridges
       let classifiedBridges: { bridgeId: string; label: string }[] = [];
       try {
-        classifiedBridges = await classifyPaperAcrossBridges(paper, context, callbacks, config);
+        classifiedBridges = await classifyPaperAcrossBridges(paper, context, callbacks);
       } catch {
         // non-fatal
       }
@@ -385,7 +329,7 @@ ${abstract ? `Abstract: ${abstract}` : '(No abstract available)'}
 
 Return ONLY the summary text.`;
 
-        const summary = await geminiGenerate(config, prompt);
+        const summary = await llmGenerate('chat', [{ role: 'user', content: prompt }]);
         callbacks.onToolStatus(null);
         return { content: summary, summary };
       } catch (e) {
@@ -399,13 +343,12 @@ Return ONLY the summary text.`;
   }
 }
 
-// ─── Auto-classification (Gemini) ──────────────────────────
+// ─── Auto-classification ─────────────────────────────────
 
 async function classifyPaperAcrossBridges(
   paper: Paper,
   context: ChatContext,
   callbacks: ToolCallbacks,
-  config: GeminiConfig,
 ): Promise<{ bridgeId: string; label: string }[]> {
   const otherBridges = context.allBridges.filter((b) => b.id !== context.entityId);
   const otherRoads = context.allRoads.filter((r) => r.id !== context.entityId);
@@ -431,7 +374,7 @@ If none, return [].`;
 
   let classified: { type: string; id: string }[];
   try {
-    classified = await geminiGenerateJSON<{ type: string; id: string }[]>(config, prompt);
+    classified = await llmGenerateJSON<{ type: string; id: string }[]>('chat', [{ role: 'user', content: prompt }]);
   } catch {
     return [];
   }
@@ -456,85 +399,61 @@ If none, return [].`;
   return results;
 }
 
-// ─── Main chat function (Gemini) ───────────────────────────
+// ─── Main chat function (provider-agnostic) ──────────────
 
 export async function* streamChatMessage(
   apiMessages: ApiMessage[],
   context: ChatContext,
   callbacks: ToolCallbacks,
 ): AsyncGenerator<StreamChunk> {
-  const config = getGeminiConfig();
-  if (!config) {
-    yield { type: 'error', message: 'Gemini API 키가 설정되지 않았습니다. AI 설정에서 키를 입력해주세요.' };
+  // Validate API key availability
+  try {
+    getLLMConfig();
+  } catch {
+    yield { type: 'error', message: 'AI API 키가 설정되지 않았습니다. AI 설정에서 키를 입력해주세요.' };
     return;
   }
 
   const system = buildSystemPrompt(context);
-  const contents = toGeminiContents(apiMessages);
+  const contents: unknown[] = toInitialContents(apiMessages);
   let fullText = '';
   const allPaperCards: PaperCard[] = [];
 
   // Tool use loop
   for (let round = 0; round < 5; round++) {
-    let response: GeminiResponse;
+    let response;
     try {
-      response = await callGemini(config, contents, system);
+      response = await llmChatWithTools('chat', contents, system, TOOL_DECLARATIONS);
     } catch (e) {
       yield { type: 'error', message: (e as Error).message };
       return;
     }
 
-    const candidate = response.candidates?.[0];
-    const parts = candidate?.content?.parts ?? [];
-
-    // Extract text and function calls
-    let roundText = '';
-    const functionCalls: { name: string; args: Record<string, unknown> }[] = [];
-
-    for (const part of parts) {
-      if (part.text) {
-        roundText += part.text;
-      }
-      if (part.functionCall) {
-        functionCalls.push({
-          name: part.functionCall.name,
-          args: part.functionCall.args ?? {},
-        });
-      }
-    }
-
     // Yield text
+    const roundText = response.textParts.join('');
     if (roundText) {
       fullText += roundText;
       yield { type: 'text_delta', text: roundText };
     }
 
     // If no function calls, we're done
-    if (functionCalls.length === 0) break;
+    if (response.toolCalls.length === 0) break;
 
     // Add model response to conversation
-    contents.push({
-      role: 'model',
-      parts: parts.map((p) => {
-        if (p.functionCall) return { functionCall: p.functionCall };
-        if (p.text) return { text: p.text };
-        return { text: '' };
-      }),
-    });
+    contents.push(response.rawContent);
 
     // Execute function calls and build responses
-    const responseParts: GeminiPart[] = [];
+    const toolResults: ToolResult[] = [];
 
-    for (const fc of functionCalls) {
+    for (const fc of response.toolCalls) {
       yield { type: 'tool_call_start', name: fc.name };
 
-      const result = await executeTool(fc.name, fc.args, context, callbacks, config);
+      const result = await executeTool(fc.name, fc.args, context, callbacks);
 
-      responseParts.push({
-        functionResponse: {
-          name: fc.name,
-          response: { result: result.content },
-        },
+      toolResults.push({
+        callId: fc.id,
+        name: fc.name,
+        content: result.content,
       });
 
       if (result.papers) {
@@ -549,7 +468,8 @@ export async function* streamChatMessage(
     }
 
     // Add function responses to conversation
-    contents.push({ role: 'user', parts: responseParts });
+    const toolResultMsg = buildToolResultMessage('chat', toolResults);
+    contents.push(toolResultMsg);
 
     // Reset for next round
     fullText = '';
