@@ -81,14 +81,6 @@ function renderAISummary(text: string): string {
       return `<p style="${SH}">${escapeHtml(title)}</p><ul style="margin:0;padding-left:18px;font-size:0.82rem">${items}</ul>`;
     }
 
-    if (title.includes('인용 포인트')) {
-      const quotes = body.split('\n')
-        .filter(l => l.trim().startsWith('>'))
-        .map(l => `<blockquote style="border-left:3px solid var(--text-tertiary,#999);margin:4px 0;padding:4px 10px;color:var(--text-secondary);font-style:italic;font-size:0.82rem">${renderInline(l.replace(/^>\s*/, ''))}</blockquote>`)
-        .join('');
-      return `<p style="${SH}">${escapeHtml(title)}</p>${quotes || renderMarkdown(body)}`;
-    }
-
     return `<p style="${SH}">${escapeHtml(title)}</p><div style="font-size:0.82rem">${renderMarkdown(body)}</div>`;
   }).join('');
 }

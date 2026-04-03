@@ -23,12 +23,6 @@ Analyze the following paper and return a structured summary in EXACTLY this mark
 ## 주요 발견
 - [결과 bullet 2~4개, 수치/통계 포함]
 
-## 한계 & 후속 연구
-[저자가 인정한 한계점과 열린 연구 질문]
-
-## 인용 포인트
-> [논문 원문에서 그대로 인용할 수 있는 핵심 영어 문장 1~2개]
-
 ---
 Paper info:
 Title: ${paper.title}
