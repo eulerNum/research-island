@@ -363,7 +363,7 @@ export default function DetailPanel({
                   </div>
                 )}
                 {paper.comment && (
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 4, fontStyle: 'italic' }}>
+                  <div style={{ color: 'var(--text-secondary)', fontSize: '0.75rem', marginTop: 4, fontStyle: 'italic', borderLeft: '2px solid var(--accent-forward)', paddingLeft: 6 }}>
                     {paper.comment}
                   </div>
                 )}
