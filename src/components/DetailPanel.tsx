@@ -69,6 +69,8 @@ export default function DetailPanel({
   aiChatOpen,
   onToggleAIChat,
   onStudyPaper,
+  sourceLabel,
+  targetLabel,
 }: DetailPanelProps) {
   const [showPaperForm, setShowPaperForm] = useState(false);
   const [editingPaper, setEditingPaper] = useState<Paper | null>(null);
@@ -233,7 +235,16 @@ export default function DetailPanel({
       }}>
 
       {/* Gap Memos */}
-      <GapMemo gaps={gaps} gapIds={gapIds} onAddGap={onAddGap} onDeleteGap={onDeleteGap} />
+      <GapMemo
+        gaps={gaps}
+        gapIds={gapIds}
+        onAddGap={onAddGap}
+        onDeleteGap={onDeleteGap}
+        papers={papers}
+        sourceLabel={sourceLabel}
+        targetLabel={targetLabel}
+        direction={bridge?.direction ?? road?.direction}
+      />
 
       {/* Papers */}
       <div>
