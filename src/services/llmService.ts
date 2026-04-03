@@ -59,7 +59,7 @@ export interface ToolResult {
 
 export const AVAILABLE_MODELS: ModelOption[] = [
   { provider: 'gemini', modelId: 'gemini-2.5-flash-lite', displayName: 'Gemini 2.5 Flash-Lite', costTier: 'free' },
-  { provider: 'gemini', modelId: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', costTier: 'cheap' },
+  { provider: 'gemini', modelId: 'gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', costTier: 'free' },
   { provider: 'gemini', modelId: 'gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', costTier: 'moderate' },
   { provider: 'openai', modelId: 'gpt-4o-mini', displayName: 'GPT-4o Mini', costTier: 'cheap' },
   { provider: 'openai', modelId: 'gpt-4o', displayName: 'GPT-4o', costTier: 'moderate' },
