@@ -1,6 +1,22 @@
 import type { Paper } from './types';
 import { llmGenerateJSON } from './llmService';
 
+/** Jaccard similarity on space-split tokens (0~1). Handles Korean naturally. */
+function jaccardSim(a: string, b: string): number {
+  const tok = (s: string) =>
+    new Set(s.toLowerCase().replace(/[^\w\s가-힣]/g, '').split(/\s+/).filter(Boolean));
+  const A = tok(a);
+  const B = tok(b);
+  let inter = 0;
+  A.forEach((w) => { if (B.has(w)) inter++; });
+  const union = new Set([...A, ...B]).size;
+  return union === 0 ? 0 : inter / union;
+}
+
+function isDuplicate(suggestion: string, existing: string[]): boolean {
+  return existing.some((e) => jaccardSim(suggestion, e) >= 0.35);
+}
+
 export interface GapSuggestion {
   description: string;
   relatedPaperIds: string[];
@@ -99,9 +115,10 @@ Return ONLY valid JSON array (no text outside the array):
       { role: 'user', content: prompt },
     ]);
     if (!Array.isArray(result)) return [];
-    return result.filter(
+    const valid = result.filter(
       (s) => s && typeof s.description === 'string' && typeof s.dimension === 'string',
     );
+    return valid.filter((s) => !isDuplicate(s.description, existingGapDescriptions));
   } catch {
     return [];
   }
