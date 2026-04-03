@@ -8,25 +8,26 @@ export async function summarizePaper(paper: Paper): Promise<string> {
     : '(No abstract available — summarize based on title and metadata only)';
 
   const prompt = `You are a research assistant helping a food science researcher study academic papers.
-Analyze the following paper and return a structured summary in EXACTLY this markdown format (300-500 words total):
+Analyze the following paper and return a structured summary in EXACTLY this markdown format.
+모든 내용은 한국어로 작성하라. 고유명사·학술 기법명만 영어 원문 병기 가능.
 
 ## 한줄 요약
-[핵심 기여를 1문장으로 — 한국어]
+[핵심 기여를 1문장으로]
 
 ## 연구 프레임
-- **대상(Subject)**: 무엇을/누구를 연구했는가 (한국어, 핵심 용어는 영어 병기)
-- **과업(Task)**: 어떤 문제 또는 목표를 다루는가 (한국어)
-- **시스템(System)**: 어떤 방법론/도구/모델/절차를 사용했는가 (한국어, 기법명은 영어 원문)
-- **검증(Validation)**: 어떻게 효과를 측정하거나 검증했는가 (한국어)
+- **대상(Subject)**: 무엇을/누구를 연구했는가
+- **과업(Task)**: 어떤 문제 또는 목표를 다루는가
+- **시스템(System)**: 어떤 방법론/도구/모델/절차를 사용했는가
+- **검증(Validation)**: 어떻게 효과를 측정하거나 검증했는가
 
 ## 주요 발견
-- [결과 bullet 2~4개, 수치/통계 포함 가능, 한국어]
+- [결과 bullet 2~4개, 수치/통계 포함]
 
 ## 한계 & 후속 연구
-[저자가 인정한 한계점과 열린 연구 질문 — 한국어]
+[저자가 인정한 한계점과 열린 연구 질문]
 
 ## 인용 포인트
-> [영어 원문에서 그대로 인용할 수 있는 핵심 문장 1~2개]
+> [논문 원문에서 그대로 인용할 수 있는 핵심 영어 문장 1~2개]
 
 ---
 Paper info:

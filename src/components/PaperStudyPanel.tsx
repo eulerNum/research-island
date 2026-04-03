@@ -33,6 +33,66 @@ function renderMarkdown(text: string): string {
     .replace(/\n/g, '<br>');
 }
 
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function renderInline(s: string): string {
+  return escapeHtml(s)
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+}
+
+const SH = 'font-size:0.72rem;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.06em;margin:14px 0 5px';
+
+/** Structured renderer for AI summary output */
+function renderAISummary(text: string): string {
+  const parts = text.split(/(?=^## )/m).filter(s => s.trim());
+  return parts.map(part => {
+    const nl = part.indexOf('\n');
+    if (nl === -1) return renderMarkdown(part);
+    const title = part.slice(2, nl).trim(); // strip leading '## '
+    const body = part.slice(nl + 1).trim();
+
+    if (title.includes('한줄 요약')) {
+      return `<div style="background:rgba(42,157,143,0.1);border-left:3px solid var(--accent-forward,#2a9d8f);padding:8px 12px;border-radius:0 4px 4px 0;font-weight:500;margin-bottom:2px">${renderInline(body)}</div>`;
+    }
+
+    if (title.includes('연구 프레임')) {
+      const rows = body.split('\n')
+        .filter(l => l.trim().startsWith('-'))
+        .map(l => {
+          const m = l.match(/^-\s*\*\*(.+?)\*\*:\s*(.+)$/);
+          if (!m) return '';
+          return `<tr>
+            <th style="padding:5px 10px 5px 0;white-space:nowrap;color:var(--text-secondary);font-weight:600;font-size:0.8rem;vertical-align:top;width:1%">${escapeHtml(m[1])}</th>
+            <td style="padding:5px 0;font-size:0.82rem;color:var(--text-primary)">${renderInline(m[2])}</td>
+          </tr>`;
+        }).filter(Boolean).join('');
+      if (!rows) return renderMarkdown(part);
+      return `<p style="${SH}">${escapeHtml(title)}</p><table style="width:100%;border-collapse:collapse">${rows}</table>`;
+    }
+
+    if (title.includes('주요 발견')) {
+      const items = body.split('\n')
+        .filter(l => l.trim().startsWith('-'))
+        .map(l => `<li style="margin-bottom:3px">${renderInline(l.replace(/^-\s*/, ''))}</li>`)
+        .join('');
+      return `<p style="${SH}">${escapeHtml(title)}</p><ul style="margin:0;padding-left:18px;font-size:0.82rem">${items}</ul>`;
+    }
+
+    if (title.includes('인용 포인트')) {
+      const quotes = body.split('\n')
+        .filter(l => l.trim().startsWith('>'))
+        .map(l => `<blockquote style="border-left:3px solid var(--text-tertiary,#999);margin:4px 0;padding:4px 10px;color:var(--text-secondary);font-style:italic;font-size:0.82rem">${renderInline(l.replace(/^>\s*/, ''))}</blockquote>`)
+        .join('');
+      return `<p style="${SH}">${escapeHtml(title)}</p>${quotes || renderMarkdown(body)}`;
+    }
+
+    return `<p style="${SH}">${escapeHtml(title)}</p><div style="font-size:0.82rem">${renderMarkdown(body)}</div>`;
+  }).join('');
+}
+
 export default function PaperStudyPanel({
   paper,
   allBridges,
@@ -218,7 +278,7 @@ export default function PaperStudyPanel({
         <h3 style={sectionHeader}>AI Summary</h3>
         {paper.aiSummary ? (
           <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: 1.6, padding: '10px 12px', background: 'var(--bg-secondary)', borderRadius: 6 }}>
-            <div dangerouslySetInnerHTML={{ __html: renderMarkdown(paper.aiSummary) }} />
+            <div dangerouslySetInnerHTML={{ __html: renderAISummary(paper.aiSummary) }} />
             <div style={{ marginTop: 8 }}>
               <button onClick={handleGenerateSummary} disabled={aiLoading} style={smallBtn}>
                 {aiLoading ? '...' : 'Regenerate'}
