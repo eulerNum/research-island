@@ -36,11 +36,13 @@ Status: 진행 중
 - [ ] Vitest + `vitest.config.ts` + `src/services/__tests__/smoke.test.ts` 1개
 - [ ] ~~`.claude/settings.local.json` lint hook~~ → **Phase B로 이관**: PreToolUse + git commit 분기 + block JSON 출력의 정확한 schema 검증 + PowerShell wrapper script 작성이 별도 작업. Phase B 안정성 step에 묶음.
 
-### Step A-2: craft-pack 즉시 승격 (담당: 메인)
-- [x] `~/.claude/craft-packs/researcher/templates/research-ontology.md` 신설 (4계층 정의 + 두 프로젝트 매핑 사례)
-- [x] `~/.claude/craft-packs/researcher/templates/paper-summary-format.md` 신설 (4섹션 schema + LLM 프롬프트 변수화)
-- [x] `~/.claude/craft-packs/researcher/pack.md` 승격 이력 표에 Phase A 한 줄 추가
-- [x] `CLAUDE.md`에 craft-pack 참조 한 줄 추가 (`## Craft` 섹션)
+### Step A-2: craft-pack 승격 (보류 결정, 2026-04-24)
+- [~] ~~`~/.claude/craft-packs/researcher/templates/research-ontology.md` 신설~~ → **보류**
+- [~] ~~`~/.claude/craft-packs/researcher/templates/paper-summary-format.md` 신설~~ → **보류**
+- [~] ~~`~/.claude/craft-packs/researcher/pack.md` 승격 이력 갱신~~ → **보류**
+- [x] `CLAUDE.md`에 craft-pack 참조 한 줄 추가 (`## Craft` 섹션) — 기존 researcher pack 참조이므로 유지
+
+> 보류 사유: 사용자 1인 + 본 세션(Claude Code Opus 4.7 1M context)에서 직접 작업하는 환경에서는 craft-pack templates를 글로벌로 끌어올릴 실익이 적음. 다중 사용자 / Anthropic Console / API 자동화 등 다른 환경에서 craft-pack을 재참조해야 할 시점에 재추진. 본 프로젝트의 ontology/요약 schema 지식은 (a) `src/services/types.ts` (b) `docs/decisions/` (c) 본 프로젝트 메모리에 충분히 보존되어 있음.
 
 ### Step A-3: 검증 + 메모리 동기화 (담당: 메인)
 - [ ] `npm run build` + `npm run lint` + `npx vitest run` 모두 통과 확인
