@@ -5,6 +5,8 @@
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
       "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npx vitest:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "WebSearch",

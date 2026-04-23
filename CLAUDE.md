@@ -9,10 +9,19 @@ npm install          # install dependencies
 npm run dev          # dev server (Vite)
 npm run build        # type-check (tsc -b) then production build
 npm run lint         # ESLint
+npm test             # Vitest (services 단위 테스트, vitest.config.ts)
 npx tsc --noEmit     # type-check only
 ```
 
-No test runner is configured yet.
+## Craft
+
+- `~/.claude/craft-packs/researcher/pack.md` — 연구 워크플로우 공용 자산 (4계층 ontology, 논문 요약 schema, Phase 운영 가이드)
+
+## Plan & Decisions
+
+- 진행 중인 Phase는 `TODO.md` (3단계 구조: Phase / Step / Task)
+- 결정 기록은 `docs/decisions/NNNN-*.md` (ADR — 왜 그렇게 했는지)
+- 현재 활성 Phase: **A — 거버넌스 정렬 + craft-pack 즉시 승격** (`~/.claude/plans/wild-foraging-music.md`)
 
 ## Tech Stack
 
