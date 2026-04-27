@@ -46,7 +46,7 @@ function toPaper(work: OAWork): Paper | null {
     abstract: reconstructAbstract(work.abstract_inverted_index),
     citationCount: work.cited_by_count,
     url: work.doi ? `https://doi.org/${work.doi.replace('https://doi.org/', '')}` : undefined,
-    source: 'manual' as const,
+    source: 'openalex' as const,
     createdAt: new Date().toISOString(),
   };
 }

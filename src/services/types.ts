@@ -13,7 +13,7 @@ export interface Paper {
   figureUrls?: string[];
   citationCount?: number;
   url?: string;
-  source: 'semantic_scholar' | 'manual' | 'n8n_import';
+  source: 'semantic_scholar' | 'openalex' | 'pubmed' | 'manual' | 'n8n_import';
   createdAt: string;
 }
 

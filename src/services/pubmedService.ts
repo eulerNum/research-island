@@ -77,7 +77,7 @@ export async function searchPubMed(
       year,
       journal: article.fulljournalname ?? article.source,
       url: doi ? `https://doi.org/${doi}` : `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`,
-      source: 'manual' as const,
+      source: 'pubmed' as const,
       createdAt: new Date().toISOString(),
     });
   }
